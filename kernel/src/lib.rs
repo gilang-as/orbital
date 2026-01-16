@@ -10,11 +10,17 @@ use core::panic::PanicInfo;
 
 pub mod allocator;
 pub mod gdt;
+pub mod input;
 pub mod interrupts;
+pub mod ipc;
 pub mod memory;
+pub mod process;
+pub mod scheduler;
 pub mod serial;
 pub mod shell;
+pub mod syscall;
 pub mod task;
+pub mod tty;
 pub mod vga_buffer;
 
 pub fn init() {

@@ -4,7 +4,13 @@ members = [
     "boot",
     "common",
 ]
+exclude = [
+    "userspace/ipc",
+    "userspace/managementd",
+    "userspace/cli",
+]
 resolver = "2"
+default-members = ["boot"]
 
 [workspace.package]
 version = "0.1.0"

@@ -81,10 +81,24 @@ pub struct Writer {
 impl Writer {
     /// Writes an ASCII byte to the buffer.
     ///
-    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character.
+    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character and backspace.
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
+            0x08 => { // Backspace (ASCII code 8): move cursor back and clear
+                if self.column_position > 0 {
+                    self.column_position -= 1;
+                    let row = BUFFER_HEIGHT - 1;
+                    let col = self.column_position;
+                    
+                    // Write blank character at current position
+                    let blank = ScreenChar {
+                        ascii_character: b' ',
+                        color_code: self.color_code,
+                    };
+                    self.buffer.chars[row][col].write(blank);
+                }
+            }
             byte => {
                 if self.column_position >= BUFFER_WIDTH {
                     self.new_line();
@@ -105,14 +119,14 @@ impl Writer {
 
     /// Writes the given ASCII string to the buffer.
     ///
-    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character. Does **not**
-    /// support strings with non-ASCII characters, since they can't be printed in the VGA text
-    /// mode.
+    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character and backspace.
+    /// Does **not** support strings with non-ASCII characters, since they can't be printed 
+    /// in the VGA text mode.
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // printable ASCII byte, newline, or backspace
+                0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
@@ -141,7 +155,66 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
+
+    /// Updates the hardware cursor position on screen
+    ///
+    /// The VGA cursor is a hardware feature that shows where the next character will be printed.
+    /// We position it at the end of the last line where text has been written.
+    pub fn update_cursor(&self) {
+        use x86_64::instructions::port::Port;
+
+        let position = (BUFFER_HEIGHT - 1) * BUFFER_WIDTH + self.column_position;
+        let position_low = (position & 0xff) as u8;
+        let position_high = ((position >> 8) & 0xff) as u8;
+
+        unsafe {
+            // Write cursor position to VGA controller
+            let mut cmd_port = Port::new(0x3d4u16);
+            let mut data_port = Port::new(0x3d5u16);
+
+            // Cursor position high byte
+            cmd_port.write(0x0eu8);
+            data_port.write(position_high);
+
+            // Cursor position low byte
+            cmd_port.write(0x0fu8);
+            data_port.write(position_low);
+        }
+    }
+
+    /// Hide the hardware cursor
+    pub fn hide_cursor(&self) {
+        use x86_64::instructions::port::Port;
+
+        unsafe {
+            let mut cmd_port = Port::new(0x3d4u16);
+            let mut data_port = Port::new(0x3d5u16);
+
+            // Disable cursor (set scan line start above character)
+            cmd_port.write(0x0au8);
+            data_port.write(0x20u8);
+        }
+    }
+
+    /// Show the hardware cursor
+    pub fn show_cursor(&self) {
+        use x86_64::instructions::port::Port;
+
+        unsafe {
+            let mut cmd_port = Port::new(0x3d4u16);
+            let mut data_port = Port::new(0x3d5u16);
+
+            // Enable cursor - set cursor start scan line to 0 (top of character)
+            cmd_port.write(0x0au8);
+            data_port.write(0x00u8);
+
+            // Set cursor end scan line to 15 (bottom of character)
+            cmd_port.write(0x0bu8);
+            data_port.write(0x0fu8);
+        }
+    }
 }
+
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {

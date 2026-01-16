@@ -1,0 +1,64 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Kernel",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["bootimage"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "Run in QEMU",
+            "type": "shell",
+            "command": "qemu-system-x86_64",
+            "args": [
+                "-drive",
+                "format=raw,file=/Volumes/Works/Projects/orbital/target/x86_64-orbital/debug/bootimage-orbital.bin",
+                "-m",
+                "256",
+                "-cpu",
+                "qemu64",
+                "-monitor",
+                "stdio",
+                "-serial",
+                "pty"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated"
+            },
+            "isBackground": false
+        },
+        {
+            "label": "Build & Run",
+            "type": "shell",
+            "command": "cargo bootimage && qemu-system-x86_64 -drive format=raw,file=/Volumes/Works/Projects/orbital/target/x86_64-orbital/debug/bootimage-orbital.bin -m 256 -cpu qemu64 -monitor stdio",
+            "problemMatcher": [
+                "$rustc"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": true,
+                "panel": "dedicated"
+            },
+            "isBackground": false
+        }
+    ]
+}

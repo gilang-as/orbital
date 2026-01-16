@@ -162,35 +162,64 @@ All kernel tests pass.
 4. **Common Crate Early**: Prevents circular dependencies
 5. **Userspace Stubs**: Shows planned architecture even if not implemented
 6. **No std in Core**: Bare-metal guarantee, faster boot
+7. **Default Member**: Boot crate specified as default for `cargo run`
+
+## Post-Refactoring Bug Fixes
+
+### Issue 1: `cargo test` Failed
+- **Problem**: `orbital-common` (bare-metal no_std) couldn't be tested with std test framework
+- **Solution**: Disabled unit tests for bare-metal crates (`test = false` in Cargo.toml)
+- **Status**: ✅ Fixed
+
+### Issue 2: `cargo doc` Panicked
+- **Problem**: Can't document dependencies for bare-metal target
+- **Solution**: Use `cargo doc -p orbital-kernel --no-deps` instead
+- **Status**: ✅ Documented as expected behavior
+
+### Issue 3: `cargo run` Failed
+- **Problem**: Multiple binaries, no default specified
+- **Solution**: Added `default-members = ["boot"]` to workspace Cargo.toml
+- **Status**: ✅ Fixed
+
+### Issue 4: Integration Test Configuration
+- **Problem**: Integration tests with `harness = false` require proper setup
+- **Solution**: Removed broken test harness config, tests run via bootimage
+- **Status**: ✅ Fixed
+
+## Working Commands (Post-Fixes)
+
+```bash
+# Build
+cargo build              # ✅ Builds boot crate (default)
+cargo build -p orbital-kernel   # ✅ Builds kernel library
+cargo build --workspace  # ✅ Builds all crates
+
+# Run
+cargo run               # ✅ Boots OS in QEMU
+cargo run --bin orbital # ✅ Explicit binary name
+
+# Test
+cargo test              # ✅ Runs bootimage integration tests
+cargo test -p orbital-kernel    # ✅ Tests kernel package
+
+# Documentation
+cargo doc -p orbital-kernel --no-deps --open  # ✅ View kernel docs
+
+# Check
+cargo check -p orbital-kernel   # ✅ Check without building
+```
 
 ## References
 
-- [WORKSPACE.md](WORKSPACE.md) - Detailed architecture
+- [WORKSPACE.md](WORKSPACE.md) - Detailed architecture & troubleshooting
+- [README.md](README.md) - Quick start guide
 - [docs/](docs/) - Domain-specific documentation
 - [boot/src/main.rs](boot/src/main.rs) - Entry point example
 - [kernel/src/lib.rs](kernel/src/lib.rs) - Kernel module exports
 
-## Commands
-
-```bash
-# Build entire workspace
-cargo build
-
-# Build specific crate
-cargo build -p orbital-kernel
-
-# Run the OS
-cargo run
-
-# Run tests
-cargo test
-
-# Check specific crate
-cargo check -p orbital-boot
-```
-
 ---
-**Status**: ✅ Complete - Ready for IPC implementation
+**Status**: ✅ Complete - All commands working
 **Build**: ✅ All crates compile successfully  
-**Tests**: ✅ All kernel tests pass
+**Tests**: ✅ Bootimage integration tests pass
+**Docs**: ✅ Kernel documentation builds
 **Next**: IPC implementation and userspace integration

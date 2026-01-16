@@ -1,10 +1,11 @@
 [package]
-name = "orbital-ipc"
+name = "orbital-cli"
 version = "0.1.0"
 authors = ["Gilang Adi S <contact@gilang.dev>"]
 edition = "2021"
 
-[lib]
+[[bin]]
+name = "orbital-cli"
+path = "src/main.rs"
 
 [dependencies]
-orbital-common = { path = "../../common" }

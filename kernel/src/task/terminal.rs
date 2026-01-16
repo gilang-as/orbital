@@ -16,7 +16,8 @@ pub async fn terminal() {
     let mut shell = Shell::new();
     let mut input_line = String::new();
     
-    println!("> ", );
+    print!("> ");
+    update_cursor();
 
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
@@ -31,16 +32,23 @@ pub async fn terminal() {
                                     input_line.clear();
                                 }
                                 print!("> ");
+                                update_cursor();
                             }
                             '\u{0008}' => { // Backspace
                                 if !input_line.is_empty() {
                                     input_line.pop();
-                                    print!("\u{0008} \u{0008}");
+                                    // Print actual backspace character - VGA buffer will handle it
+                                    print!("\u{0008}");
+                                    update_cursor();
                                 }
                             }
                             _ => {
                                 input_line.push(character);
                                 print!("{}", character);
+                                update_cursor();
+                                
+                                // Queue character for userspace to read via sys_read
+                                crate::input::add_input_char(character as u8);
                             }
                         }
                     }
@@ -51,4 +59,14 @@ pub async fn terminal() {
             }
         }
     }
+}
+
+/// Update the VGA hardware cursor position
+fn update_cursor() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let writer = crate::vga_buffer::WRITER.lock();
+        writer.update_cursor();
+        writer.show_cursor();
+    });
 }
