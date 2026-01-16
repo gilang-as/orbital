@@ -1,0 +1,12 @@
+[package]
+name = "orbital-managementd"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "managementd"
+path = "src/main.rs"
+
+[dependencies]
+orbital-common = { path = "../../common" }

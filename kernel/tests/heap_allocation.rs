@@ -1,24 +1,24 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![test_runner(orbital::test_runner)]
+#![test_runner(orbital_kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, vec::Vec};
-use orbital::allocator::HEAP_SIZE;
+use orbital_kernel::allocator::HEAP_SIZE;
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
 
 entry_point!(main);
 
 fn main(boot_info: &'static BootInfo) -> ! {
-    use orbital::allocator;
-    use orbital::memory::{self, BootInfoFrameAllocator};
+    use orbital_kernel::allocator;
+    use orbital_kernel::memory::{self, BootInfoFrameAllocator};
     use x86_64::VirtAddr;
 
-    orbital::init();
+    orbital_kernel::init();
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_map) };
@@ -66,5 +66,5 @@ fn many_boxes_long_lived() {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    orbital::test_panic_handler(info)
+    orbital_kernel::test_panic_handler(info)
 }

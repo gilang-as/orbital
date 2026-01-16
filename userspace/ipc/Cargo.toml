@@ -1,0 +1,10 @@
+[package]
+name = "orbital-ipc"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+
+[dependencies]
+orbital-common = { path = "../../common" }
