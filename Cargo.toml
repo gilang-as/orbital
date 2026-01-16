@@ -4,6 +4,10 @@ members = [
     "boot",
     "common",
 ]
+exclude = [
+    "userspace/ipc",
+    "userspace/managementd",
+]
 resolver = "2"
 default-members = ["boot"]
 

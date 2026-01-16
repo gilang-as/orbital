@@ -11,6 +11,7 @@ use core::panic::PanicInfo;
 pub mod allocator;
 pub mod gdt;
 pub mod interrupts;
+pub mod ipc;
 pub mod memory;
 pub mod serial;
 pub mod shell;
