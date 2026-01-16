@@ -16,7 +16,8 @@ pub async fn terminal() {
     let mut shell = Shell::new();
     let mut input_line = String::new();
     
-    println!("> ");
+    print!("> ");
+    update_cursor();
 
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
@@ -63,5 +64,6 @@ fn update_cursor() {
     interrupts::without_interrupts(|| {
         let writer = crate::vga_buffer::WRITER.lock();
         writer.update_cursor();
+        writer.show_cursor();
     });
 }

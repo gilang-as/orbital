@@ -195,6 +195,24 @@ impl Writer {
             data_port.write(0x20u8);
         }
     }
+
+    /// Show the hardware cursor
+    pub fn show_cursor(&self) {
+        use x86_64::instructions::port::Port;
+
+        unsafe {
+            let mut cmd_port = Port::new(0x3d4u16);
+            let mut data_port = Port::new(0x3d5u16);
+
+            // Enable cursor - set cursor start scan line to 0 (top of character)
+            cmd_port.write(0x0au8);
+            data_port.write(0x00u8);
+
+            // Set cursor end scan line to 15 (bottom of character)
+            cmd_port.write(0x0bu8);
+            data_port.write(0x0fu8);
+        }
+    }
 }
 
 
