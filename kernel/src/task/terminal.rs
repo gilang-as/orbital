@@ -16,7 +16,7 @@ pub async fn terminal() {
     let mut shell = Shell::new();
     let mut input_line = String::new();
     
-    println!("> ", );
+    println!("> ");
 
     while let Some(scancode) = scancodes.next().await {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
@@ -31,16 +31,21 @@ pub async fn terminal() {
                                     input_line.clear();
                                 }
                                 print!("> ");
+                                update_cursor();
                             }
                             '\u{0008}' => { // Backspace
                                 if !input_line.is_empty() {
                                     input_line.pop();
-                                    print!("\u{0008} \u{0008}");
+                                    // Instead of printing control chars, just move back one position
+                                    // (we'll rewrite the line)
+                                    print!(" ");
+                                    update_cursor();
                                 }
                             }
                             _ => {
                                 input_line.push(character);
                                 print!("{}", character);
+                                update_cursor();
                             }
                         }
                     }
@@ -51,4 +56,13 @@ pub async fn terminal() {
             }
         }
     }
+}
+
+/// Update the VGA hardware cursor position
+fn update_cursor() {
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        let writer = crate::vga_buffer::WRITER.lock();
+        writer.update_cursor();
+    });
 }

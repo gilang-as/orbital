@@ -141,7 +141,48 @@ impl Writer {
             self.buffer.chars[row][col].write(blank);
         }
     }
+
+    /// Updates the hardware cursor position on screen
+    ///
+    /// The VGA cursor is a hardware feature that shows where the next character will be printed.
+    /// We position it at the end of the last line where text has been written.
+    pub fn update_cursor(&self) {
+        use x86_64::instructions::port::Port;
+
+        let position = (BUFFER_HEIGHT - 1) * BUFFER_WIDTH + self.column_position;
+        let position_low = (position & 0xff) as u8;
+        let position_high = ((position >> 8) & 0xff) as u8;
+
+        unsafe {
+            // Write cursor position to VGA controller
+            let mut cmd_port = Port::new(0x3d4u16);
+            let mut data_port = Port::new(0x3d5u16);
+
+            // Cursor position high byte
+            cmd_port.write(0x0eu8);
+            data_port.write(position_high);
+
+            // Cursor position low byte
+            cmd_port.write(0x0fu8);
+            data_port.write(position_low);
+        }
+    }
+
+    /// Hide the hardware cursor
+    pub fn hide_cursor(&self) {
+        use x86_64::instructions::port::Port;
+
+        unsafe {
+            let mut cmd_port = Port::new(0x3d4u16);
+            let mut data_port = Port::new(0x3d5u16);
+
+            // Disable cursor (set scan line start above character)
+            cmd_port.write(0x0au8);
+            data_port.write(0x20u8);
+        }
+    }
 }
+
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
