@@ -36,9 +36,8 @@ pub async fn terminal() {
                             '\u{0008}' => { // Backspace
                                 if !input_line.is_empty() {
                                     input_line.pop();
-                                    // Instead of printing control chars, just move back one position
-                                    // (we'll rewrite the line)
-                                    print!(" ");
+                                    // Print actual backspace character - VGA buffer will handle it
+                                    print!("\u{0008}");
                                     update_cursor();
                                 }
                             }
