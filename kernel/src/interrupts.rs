@@ -72,6 +72,20 @@ extern "x86-interrupt" fn double_fault_handler(
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    // Tick the scheduler to count time ticks
+    let need_switch = crate::scheduler::timer_tick();
+
+    // If time quantum expired, perform context switch
+    if need_switch {
+        // Get next process from scheduler
+        let (current_pid, next_pid) = crate::scheduler::schedule();
+
+        // Perform context switch if there's a next process
+        if let Some(next) = next_pid {
+            crate::context_switch::context_switch(current_pid, Some(next));
+        }
+    }
+
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());

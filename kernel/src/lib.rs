@@ -9,6 +9,7 @@ extern crate alloc;
 use core::panic::PanicInfo;
 
 pub mod allocator;
+pub mod context_switch;
 pub mod gdt;
 pub mod input;
 pub mod interrupts;
