@@ -1,0 +1,9 @@
+[package]
+name = "orbital-common"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[lib]
+
+[dependencies]

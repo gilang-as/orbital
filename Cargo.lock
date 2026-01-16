@@ -115,7 +115,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "orbital"
+name = "orbital-boot"
+version = "0.1.0"
+dependencies = [
+ "bootloader",
+ "orbital-common",
+ "orbital-kernel",
+ "x86_64",
+]
+
+[[package]]
+name = "orbital-common"
+version = "0.1.0"
+
+[[package]]
+name = "orbital-kernel"
 version = "0.1.0"
 dependencies = [
  "bootloader",
@@ -124,6 +138,7 @@ dependencies = [
  "futures-util",
  "lazy_static",
  "linked_list_allocator",
+ "orbital-common",
  "pc-keyboard",
  "pic8259",
  "spin 0.5.2",

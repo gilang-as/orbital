@@ -1,25 +1,25 @@
 #![no_std]
 #![no_main]
 #![feature(custom_test_frameworks)]
-#![test_runner(orbital::test_runner)]
+#![test_runner(orbital_kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
 extern crate alloc;
 
-use orbital::println;
-use orbital::task::{Task, executor::Executor};
+use orbital_kernel::println;
+use orbital_kernel::task::{Task, executor::Executor};
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
 
 entry_point!(kernel_main);
 
 fn kernel_main(boot_info: &'static BootInfo) -> ! {
-    use orbital::allocator;
-    use orbital::memory::{self, BootInfoFrameAllocator};
+    use orbital_kernel::allocator;
+    use orbital_kernel::memory::{self, BootInfoFrameAllocator};
     use x86_64::VirtAddr;
 
     println!("Hello World{}", "!");
-    orbital::init();
+    orbital_kernel::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
     let mut mapper = unsafe { memory::init(phys_mem_offset) };
@@ -32,7 +32,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(example_task()));
-    executor.spawn(Task::new(orbital::task::terminal::terminal()));
+    executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
     executor.run();
 }
 
@@ -41,13 +41,13 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
-    orbital::hlt_loop();
+    orbital_kernel::hlt_loop();
 }
 
 #[cfg(test)]
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    orbital::test_panic_handler(info)
+    orbital_kernel::test_panic_handler(info)
 }
 
 async fn async_number() -> u32 {

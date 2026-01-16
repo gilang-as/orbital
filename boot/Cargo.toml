@@ -1,0 +1,26 @@
+[package]
+name = "orbital-boot"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+bootloader = { version = "0.9", features = ["map_physical_memory"] }
+x86_64 = "0.14.2"
+orbital-kernel = { path = "../kernel" }
+orbital-common = { path = "../common" }
+
+[[bin]]
+name = "orbital"
+path = "src/main.rs"
+
+[package.metadata.bootimage]
+test-args = [
+    "-device",
+    "isa-debug-exit,iobase=0xf4,iosize=0x04",
+    "-serial",
+    "stdio",
+    "-display",
+    "none",
+]
+test-success-exit-code = 33
