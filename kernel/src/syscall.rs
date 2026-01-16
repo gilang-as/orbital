@@ -86,6 +86,7 @@ const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
     Some(sys_exit),            // 3
     Some(sys_read),            // 4
     Some(sys_task_create),     // 5
+    Some(sys_task_wait),       // 6
     // More syscalls go here
 ];
 
@@ -97,6 +98,7 @@ pub mod nr {
     pub const SYS_EXIT: usize = 3;
     pub const SYS_READ: usize = 4;
     pub const SYS_TASK_CREATE: usize = 5;
+    pub const SYS_TASK_WAIT: usize = 6;
 }
 
 /// Main syscall dispatcher
@@ -346,6 +348,11 @@ fn sys_read(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _
 /// - Ok(pid): Process ID (positive)
 /// - Err(SysError::Invalid): Invalid entry point (NULL)
 /// - Err(SysError::Error): Too many processes or other error
+///
+/// # Process
+/// 1. Create process with entry point (allocates stack)
+/// 2. Add to scheduler ready queue
+/// 3. Return process ID
 fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
     let entry_point = arg1;
 
@@ -354,7 +361,7 @@ fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5:
         return Err(SysError::Invalid);
     }
 
-    // Create the process
+    // Create the process (allocates 4KB stack, sets up context)
     let pid = crate::process::create_process(entry_point);
 
     if pid < 0 {
@@ -365,8 +372,41 @@ fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5:
             _ => Err(SysError::Error),     // Other error
         }
     } else {
+        // Add the new process to the scheduler's ready queue
+        crate::scheduler::enqueue_process(pid as u64);
+        
+        // Update status to Ready
+        crate::process::set_process_status(pid as u64, crate::process::ProcessStatus::Ready);
+        
         // Return the process ID as success
         Ok(pid as usize)
+    }
+}
+
+/// sys_task_wait - Wait for a task to complete
+///
+/// Blocks until the specified task exits, returning its exit code.
+/// 
+/// # Arguments
+/// - arg1: Process ID to wait for
+/// - Others: Reserved
+///
+/// # Returns
+/// - Ok(exit_code): Task's exit code when it completes
+/// - Err(SysError::NotFound): Task doesn't exist
+/// - Err(SysError::Invalid): Invalid task ID
+fn sys_task_wait(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    let pid = arg1 as u64;
+
+    // Validate PID is not zero
+    if pid == 0 {
+        return Err(SysError::Invalid);
+    }
+
+    // Wait for process to exit
+    match crate::process::wait_process(pid) {
+        Some(exit_code) => Ok(exit_code as usize),
+        None => Err(SysError::NotFound),
     }
 }
 

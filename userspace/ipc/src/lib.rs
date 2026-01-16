@@ -254,6 +254,40 @@ pub fn syscall_task_create(entry_point: usize) -> SyscallResult<u64> {
     }
 }
 
+/// Syscall: task_wait - Wait for a task to complete
+///
+/// Blocks until the specified task exits, returning its exit code.
+/// Arguments: task_id (process ID to wait for)
+/// Returns: exit code on success, error otherwise
+pub fn syscall_task_wait(task_id: u64) -> SyscallResult<i64> {
+    // Invoke syscall 6 (SYS_TASK_WAIT) with:
+    //   RAX = 6 (syscall number)
+    //   RDI = task_id (process ID to wait for)
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 6_i64 => result,  // syscall number 6 (SYS_TASK_WAIT)
+            in("rdi") task_id,              // first argument: task ID
+            clobber_abi("C"),               // Tell compiler C calling convention is clobbered
+        );
+
+        if result >= 0 {
+            Ok(result as i64)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        // Non-x86_64 platforms: return not implemented
+        Err(SyscallError::NotImplemented)
+    }
+}
+
 /// Protocol version for IPC messages
 pub const IPC_PROTOCOL_VERSION: u32 = 1;
 

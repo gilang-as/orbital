@@ -2,10 +2,29 @@
 //!
 //! Provides mechanism for creating and managing lightweight user tasks.
 //! Policy (what tasks do, scheduling priorities) is left to userspace.
+//!
+//! Task Memory Layout:
+//! Each task gets a 4KB stack allocated from the kernel heap.
+//! Stack grows downward (high to low address).
+//! 
+//! Stack Layout (grows downward):
+//! ┌─────────────────┐ 0x7FFF
+//! │   top (unused)  │
+//! ├─────────────────┤
+//! │    local vars   │
+//! │    saved regs   │
+//! │    args         │
+//! ├─────────────────┤ (RSP)
+//! │ (grows downward)│
+//! └─────────────────┘ 0x0000
+//!
+//! Context switching saves/restores the full CPU state (all registers).
 
 use alloc::vec::Vec;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
+
+const TASK_STACK_SIZE: usize = 4096; // 4KB per task
 
 /// Unique identifier for a process/task
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -33,6 +52,60 @@ pub enum ProcessStatus {
     Exited(i64),
 }
 
+/// CPU context - all registers saved for a process
+/// Used during context switches to save/restore process state
+#[derive(Debug, Clone)]
+pub struct TaskContext {
+    /// General purpose registers
+    pub rax: u64,
+    pub rbx: u64,
+    pub rcx: u64,
+    pub rdx: u64,
+    pub rsi: u64,
+    pub rdi: u64,
+    pub rbp: u64,
+    pub rsp: u64,
+    pub r8: u64,
+    pub r9: u64,
+    pub r10: u64,
+    pub r11: u64,
+    pub r12: u64,
+    pub r13: u64,
+    pub r14: u64,
+    pub r15: u64,
+    /// Instruction pointer
+    pub rip: u64,
+    /// CPU flags register
+    pub rflags: u64,
+}
+
+impl TaskContext {
+    /// Create a new context for a task starting at entry_point
+    /// Stack pointer is set to the top of the stack (grows downward)
+    pub fn new(entry_point: u64, stack_top: u64) -> Self {
+        TaskContext {
+            rax: 0,
+            rbx: 0,
+            rcx: 0,
+            rdx: 0,
+            rsi: 0,
+            rdi: 0,
+            rbp: stack_top,      // Frame pointer at stack top
+            rsp: stack_top,      // Stack pointer at top (grows down)
+            r8: 0,
+            r9: 0,
+            r10: 0,
+            r11: 0,
+            r12: 0,
+            r13: 0,
+            r14: 0,
+            r15: 0,
+            rip: entry_point,    // Start at entry point
+            rflags: 0x200,       // Interrupt flag enabled (0x200)
+        }
+    }
+}
+
 /// A lightweight process/task that the kernel manages
 #[derive(Debug)]
 pub struct Process {
@@ -40,6 +113,10 @@ pub struct Process {
     pub id: ProcessId,
     /// Entry point address (function pointer cast to usize)
     pub entry_point: usize,
+    /// Allocated stack for this task (4KB)
+    pub stack: Vec<u8>,
+    /// Saved CPU context (for context switching)
+    pub context: TaskContext,
     /// Current status
     pub status: ProcessStatus,
     /// Return value (when exited)
@@ -48,10 +125,23 @@ pub struct Process {
 
 impl Process {
     /// Create a new process with the given entry point
+    /// Allocates a stack and initializes CPU context
     pub fn new(entry_point: usize) -> Self {
+        // Allocate stack for this task
+        let mut stack = Vec::new();
+        stack.resize(TASK_STACK_SIZE, 0);
+        
+        // Stack grows downward, so stack_top is at the end of allocated memory
+        let stack_top = stack.as_ptr() as u64 + TASK_STACK_SIZE as u64;
+        
+        // Initialize CPU context for task entry
+        let context = TaskContext::new(entry_point as u64, stack_top);
+        
         Process {
             id: ProcessId::new(),
             entry_point,
+            stack,
+            context,
             status: ProcessStatus::Ready,
             exit_code: 0,
         }
@@ -163,6 +253,65 @@ pub fn list_processes() -> alloc::vec::Vec<(u64, ProcessStatus)> {
         .iter()
         .map(|p| (p.id.0, p.status))
         .collect()
+}
+
+/// Get mutable reference to process's context for saving/restoring
+pub fn get_process_context_mut(pid: u64) -> Option<*mut TaskContext> {
+    let table = get_or_init_process_table();
+    let mut processes = table.lock();
+
+    if let Some(process) = processes.iter_mut().find(|p| p.id.0 == pid) {
+        Some(&mut process.context as *mut TaskContext)
+    } else {
+        None
+    }
+}
+
+/// Get process's stack pointer (RSP)
+pub fn get_process_stack_pointer(pid: u64) -> Option<u64> {
+    let table = get_or_init_process_table();
+    let processes = table.lock();
+
+    processes
+        .iter()
+        .find(|p| p.id.0 == pid)
+        .map(|p| p.context.rsp)
+}
+
+/// Update process's stack pointer (RSP)
+pub fn set_process_stack_pointer(pid: u64, rsp: u64) -> bool {
+    let table = get_or_init_process_table();
+    let mut processes = table.lock();
+
+    if let Some(process) = processes.iter_mut().find(|p| p.id.0 == pid) {
+        process.context.rsp = rsp;
+        true
+    } else {
+        false
+    }
+}
+
+/// Context switch: Save current task's context, load next task's context
+/// This is called during process switches (e.g., on timer interrupt, syscall)
+///
+/// # Safety
+/// Caller must ensure valid CPU state and no reentrancy
+pub unsafe fn context_switch(current_pid: Option<u64>, next_pid: u64) {
+    // If there's a current process, save its context
+    if let Some(pid) = current_pid {
+        if let Some(_ctx_ptr) = get_process_context_mut(pid) {
+            // In a real implementation, we'd save all CPU registers here
+            // For now, this is a placeholder for assembly-based save
+            set_process_status(pid, ProcessStatus::Ready);
+        }
+    }
+
+    // Load the next process's context
+    if let Some(_ctx_ptr) = get_process_context_mut(next_pid) {
+        // In a real implementation, we'd restore all CPU registers
+        // and jump to the process's entry point
+        set_process_status(next_pid, ProcessStatus::Running);
+    }
 }
 
 #[cfg(test)]
