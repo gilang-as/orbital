@@ -119,14 +119,14 @@ impl Writer {
 
     /// Writes the given ASCII string to the buffer.
     ///
-    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character. Does **not**
-    /// support strings with non-ASCII characters, since they can't be printed in the VGA text
-    /// mode.
+    /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character and backspace.
+    /// Does **not** support strings with non-ASCII characters, since they can't be printed 
+    /// in the VGA text mode.
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
             match byte {
-                // printable ASCII byte or newline
-                0x20..=0x7e | b'\n' => self.write_byte(byte),
+                // printable ASCII byte, newline, or backspace
+                0x20..=0x7e | b'\n' | 0x08 => self.write_byte(byte),
                 // not part of printable ASCII range
                 _ => self.write_byte(0xfe),
             }
