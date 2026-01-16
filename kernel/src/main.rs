@@ -31,7 +31,10 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     test_main();
 
     let mut executor = Executor::new();
-    executor.spawn(Task::new(example_task()));
+    
+    #[cfg(debug_assertions)]
+    executor.spawn(Task::new(kernel_init_message()));
+    
     executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
     executor.run();
 }
@@ -50,13 +53,9 @@ fn panic(info: &PanicInfo) -> ! {
     orbital_kernel::test_panic_handler(info)
 }
 
-async fn async_number() -> u32 {
-    42
-}
-
-async fn example_task() {
-    let number = async_number().await;
-    println!("async number: {}", number);
+/// Kernel initialization message (debug builds only)
+async fn kernel_init_message() {
+    println!("[DEBUG] Kernel initialized successfully - async executor operational");
 }
 
 #[test_case]
