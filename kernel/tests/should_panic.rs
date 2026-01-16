@@ -1,5 +1,8 @@
 #![no_std]
 #![no_main]
+#![feature(custom_test_frameworks)]
+#![test_runner(orbital_kernel::test_runner)]
+#![reexport_test_harness_main = "test_main"]
 
 use orbital_kernel::{QemuExitCode, exit_qemu, serial_print, serial_println};
 use core::panic::PanicInfo;

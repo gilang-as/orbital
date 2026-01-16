@@ -114,7 +114,50 @@ All system control and policy logic belongs in userspace via the management daem
 
 - **Workspace Target**: `x86_64-orbital.json` (bare-metal x86_64)
 - **Bootloader**: bootloader v0.9 with physical memory mapping
-- **Test Framework**: Custom test framework using `test_runner` attribute
+- **Default Member**: `boot` (runs via `cargo run`)
+- **Test Framework**: Bootimage integration tests + QEMU
+- **Testing**: Unit tests disabled for bare-metal crates
+
+### Workspace Configuration
+The workspace Cargo.toml specifies:
+- **members**: kernel, boot, common (userspace in separate workspace later)
+- **resolver**: version 2 (required for workspace inheritance)
+- **default-members**: boot (primary binary target)
+
+### Test Configuration
+- `orbital-kernel`: Integration tests run via bootimage + QEMU
+- `orbital-boot`: No tests (firmware entry point)
+- `orbital-common`: Tests disabled (bare-metal no_std library)
+
+## Development Workflow
+
+### Building
+```bash
+cargo build              # Build default (boot) binary
+cargo build -p orbital-kernel  # Build kernel library
+cargo build --workspace  # Build all crates in workspace
+```
+
+### Running
+```bash
+cargo run              # Run boot binary in QEMU (default)
+cargo run --bin orbital  # Explicit binary name
+```
+
+### Testing
+```bash
+cargo test             # Run bootimage integration tests
+cargo test -p orbital-kernel  # Test kernel package
+cargo test -- --nocapture  # Show test output
+```
+
+### Documentation
+```bash
+cargo doc -p orbital-kernel --no-deps  # Generate kernel docs
+cargo doc -p orbital-kernel --no-deps --open  # Open in browser
+```
+
+Note: Full `cargo doc` not supported for bare-metal target (dependencies can't be documented).
 
 ## Design Principles
 
@@ -123,6 +166,7 @@ All system control and policy logic belongs in userspace via the management daem
 3. **IPC Boundaries**: Enforced through type system and separate crates
 4. **Stubbed Interfaces**: All future features have skeleton implementations
 5. **No Direct System State**: Only through management daemon
+6. **Modular Testing**: Each crate testable according to its constraints
 
 ## Next Steps
 
@@ -132,6 +176,21 @@ All system control and policy logic belongs in userspace via the management daem
 4. **Extract Shell**: Move terminal/shell to userspace CLI tool
 5. **Add Networking**: Implement network data plane in separate crate
 6. **Add Security**: Implement RBAC and capability system
+
+## Troubleshooting
+
+### `cargo test` fails with "can't find crate for `test`"
+- This is expected for `no_std` crates
+- Solution: Run `cargo test -p orbital-kernel` to test specific packages
+- Or use `cargo run` with bootimage for integration tests
+
+### `cargo doc --open` panics
+- Bare-metal target can't document dependencies
+- Solution: Use `cargo doc -p orbital-kernel --no-deps --open`
+
+### `cargo run` says "could not determine which binary to run"
+- Solution: Already fixed! Default member is `boot`
+- Or explicitly: `cargo run --bin orbital`
 
 ## References
 

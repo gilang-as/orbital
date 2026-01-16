@@ -64,21 +64,34 @@ See [WORKSPACE.md](WORKSPACE.md) for detailed architecture documentation.
 
 ### Development Commands
 ```bash
-# Build kernel only
+# Build the workspace (boot crate is default)
+cargo build
+
+# Build specific crate
 cargo build -p orbital-kernel
-
-# Build boot crate
 cargo build -p orbital-boot
+cargo build -p orbital-common
 
-# Run all tests
+# Run the OS in QEMU (boot crate is default)
+cargo run
+
+# Run tests (bootimage integration tests)
 cargo test
 
-# Run kernel tests only
+# Run tests for specific crate
 cargo test -p orbital-kernel
 
-# Build documentation
-cargo doc --open
+# Generate and view documentation
+cargo doc -p orbital-kernel --no-deps --open
+
+# Check code without building
+cargo check -p orbital-kernel
 ```
+
+### Note on Testing
+- Unit tests for `orbital-common` and `orbital-boot` are disabled (bare-metal constraints)
+- Integration tests in `kernel/tests/` run through `cargo test` via bootimage
+- For detailed test output: `cargo test -- --nocapture`
 
 ## Testing
 

@@ -13,6 +13,7 @@ orbital-common = { path = "../common" }
 [[bin]]
 name = "orbital"
 path = "src/main.rs"
+test = false
 
 [package.metadata.bootimage]
 test-args = [

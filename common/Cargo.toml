@@ -5,5 +5,6 @@ authors.workspace = true
 edition.workspace = true
 
 [lib]
+test = false
 
 [dependencies]
