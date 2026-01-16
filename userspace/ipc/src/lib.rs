@@ -1,6 +1,8 @@
 //! IPC (Inter-Process Communication) library for Orbital OS
 //!
-//! This crate provides userspace wrappers around the kernel's minimal IPC primitive.
+//! This crate provides:
+//! 1. Userspace syscall wrappers (safe interfaces to kernel syscalls)
+//! 2. Wrappers around the kernel's minimal IPC primitive
 //!
 //! The kernel provides ONLY a ring buffer for passing raw bytes. Userspace is responsible for:
 //! - Message serialization/deserialization
@@ -13,6 +15,118 @@
 //! This separation ensures the kernel remains minimal and policies remain in userspace.
 
 use orbital_common::ipc::{MgmtCommand, MgmtResponse, RawIpcMessage};
+
+// ============================================================================
+// Syscall Wrappers
+// ============================================================================
+
+/// Error type for syscall operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyscallError {
+    Invalid,
+    NotImplemented,
+    Fault,
+    PermissionDenied,
+    NotFound,
+    Error,
+}
+
+impl SyscallError {
+    /// Convert from raw syscall return value
+    pub fn from_return_value(val: i64) -> Option<Self> {
+        match val {
+            -1 => Some(SyscallError::Invalid),
+            -2 => Some(SyscallError::NotImplemented),
+            -3 => Some(SyscallError::Fault),
+            -4 => Some(SyscallError::PermissionDenied),
+            -5 => Some(SyscallError::NotFound),
+            -6 => Some(SyscallError::Error),
+            _ => None,
+        }
+    }
+}
+
+/// Result type for syscall operations
+pub type SyscallResult<T> = Result<T, SyscallError>;
+
+// Note: These are stubs. In a real implementation, they would invoke
+// the actual syscall instruction using inline assembly.
+// Format: syscall instruction with:
+//   RAX = syscall number
+//   RDI, RSI, RDX, RCX, R8, R9 = arguments
+//   Return value in RAX
+
+/// Syscall: hello - Test syscall
+/// Arguments: magic number (0xCAFEBABE for success)
+/// Returns: 0xDEADBEEF on success
+pub fn syscall_hello(magic: u64) -> SyscallResult<u64> {
+    // TODO: Implement with inline assembly:
+    // unsafe {
+    //     let result: i64;
+    //     asm!("syscall",
+    //         inout("rax") 0usize => result,  // syscall number 0
+    //         in("rdi") magic,
+    //         clobber_abi("C"),
+    //     );
+    //     if result >= 0 {
+    //         Ok(result as u64)
+    //     } else {
+    //         Err(SyscallError::from_return_value(result).unwrap())
+    //     }
+    // }
+
+    // Stub: return error for now
+    Err(SyscallError::NotImplemented)
+}
+
+/// Syscall: log - Write message to kernel log
+/// Arguments:
+///   ptr: pointer to message buffer
+///   len: message length in bytes
+/// Returns: number of bytes written
+pub fn syscall_log(ptr: *const u8, len: usize) -> SyscallResult<usize> {
+    // TODO: Implement with inline assembly:
+    // unsafe {
+    //     let result: i64;
+    //     asm!("syscall",
+    //         inout("rax") 1usize => result,  // syscall number 1
+    //         in("rdi") ptr,
+    //         in("rsi") len,
+    //         clobber_abi("C"),
+    //     );
+    //     if result >= 0 {
+    //         Ok(result as usize)
+    //     } else {
+    //         Err(SyscallError::from_return_value(result).unwrap())
+    //     }
+    // }
+
+    // Stub: return error for now
+    Err(SyscallError::NotImplemented)
+}
+
+/// Syscall: exit - Terminate process
+/// Arguments: exit_code
+/// Returns: never (or error if already exiting)
+pub fn syscall_exit(exit_code: i32) -> SyscallResult<!> {
+    // TODO: Implement with inline assembly:
+    // unsafe {
+    //     let result: i64;
+    //     asm!("syscall",
+    //         inout("rax") 2usize => result,  // syscall number 2
+    //         in("rdi") exit_code,
+    //         clobber_abi("C"),
+    //     );
+    //     if result >= 0 {
+    //         unreachable!("exit syscall should never return")
+    //     } else {
+    //         Err(SyscallError::from_return_value(result).unwrap())?
+    //     }
+    // }
+
+    // Stub: panic for now
+    panic!("exit syscall not yet implemented")
+}
 
 /// Protocol version for IPC messages
 pub const IPC_PROTOCOL_VERSION: u32 = 1;

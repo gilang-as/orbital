@@ -97,3 +97,30 @@ fn test_breakpoint_exception() {
     // invoke a breakpoint exception
     x86_64::instructions::interrupts::int3();
 }
+
+// ============================================================================
+// Syscall Entry Point (Assembly Stub)
+// ============================================================================
+//
+// The syscall instruction (0x0F 0x05) is not routed through the IDT.
+// Instead, it uses Model-Specific Registers (MSRs):
+//   - IA32_LSTAR (0xC0000082): Entry point address
+//   - IA32_STAR (0xC0000081): Segment selectors and return location
+//   - IA32_FMASK (0xC0000084): RFLAGS mask
+//
+// When syscall is executed from userspace:
+//   1. RCX = return address (RIP)
+//   2. R11 = RFLAGS value on entry
+//   3. RAX = syscall number
+//   4. RDI, RSI, RDX, RCX, R8, R9 = arguments (System V AMD64 ABI)
+//
+// Entry point should:
+//   1. Save userspace context (RCX, R11)
+//   2. Set up kernel stack
+//   3. Call dispatch_syscall(rax, rdi, rsi, rdx, rcx, r8, r9)
+//   4. Return result in RAX
+//   5. sysret back to userspace
+//
+// TODO: Implement syscall_entry assembly and call init_syscall_msr() during boot
+// For now, syscall is not yet wired up. Full implementation in phase 2.
+
