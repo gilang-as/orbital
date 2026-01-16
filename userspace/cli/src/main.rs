@@ -9,12 +9,16 @@
 //! Commands:
 //! - help: Display available commands
 //! - echo <text>: Echo text to stdout
+//! - ps: List running processes
+//! - uptime: Show kernel uptime
+//! - spawn <count>: Spawn N tasks
 //! - exit: Quit the CLI
 //!
 //! This shows the "policy-free kernel" principle:
 //! Kernel provides I/O syscalls, userspace provides command logic.
 
-use std::io::{self, Read};
+use orbital_ipc::{syscall_task_create, syscall_task_wait, syscall_write, 
+                   syscall_get_pid, syscall_ps, syscall_uptime};
 
 // ============================================================================
 // Syscall Wrappers
@@ -170,6 +174,10 @@ impl Cli {
         match command {
             "help" => Self::cmd_help(),
             "echo" => Self::cmd_echo(args),
+            "ps" => Self::cmd_ps(),
+            "uptime" => Self::cmd_uptime(),
+            "pid" => Self::cmd_pid(),
+            "spawn" => Self::cmd_spawn(args),
             "exit" | "quit" => return false,
             _ => Self::cmd_unknown(command),
         }
@@ -182,7 +190,16 @@ impl Cli {
         println("Available Commands:");
         println("  help              - Show this help message");
         println("  echo <text>       - Echo text to stdout");
+        println("  ps                - List running processes");
+        println("  uptime            - Show kernel uptime");
+        println("  spawn <count>     - Spawn N tasks and wait for completion");
+        println("  pid               - Show current process ID");
         println("  exit or quit      - Exit the CLI");
+        println("");
+        println("Examples:");
+        println("  > echo Hello World");
+        println("  > ps");
+        println("  > spawn 3");
     }
 
     /// echo command - echo arguments to stdout
@@ -201,6 +218,107 @@ impl Cli {
             }
         }
         println(&output);
+    }
+
+    /// Unknown command handler
+    fn cmd_unknown(cmd: &str) {
+        let msg = format!("unknown command: '{}' (try 'help')", cmd);
+        println(&msg);
+    }
+
+    /// ps command - list running processes
+    fn cmd_ps() {
+        println("Running processes:");
+        
+        let mut buffer = [0u8; 512];
+        match syscall_ps(&mut buffer) {
+            Ok(bytes_written) => {
+                if let Ok(ps_output) = std::str::from_utf8(&buffer[..bytes_written]) {
+                    println(ps_output);
+                } else {
+                    println("Error: Invalid process list data");
+                }
+            }
+            Err(e) => {
+                let msg = format!("Error reading process list: {:?}", e);
+                println(&msg);
+            }
+        }
+    }
+
+    /// uptime command - show kernel uptime
+    fn cmd_uptime() {
+        match syscall_uptime() {
+            Ok(seconds) => {
+                let msg = format!("Kernel uptime: {} seconds", seconds);
+                println(&msg);
+            }
+            Err(e) => {
+                let msg = format!("Error getting uptime: {:?}", e);
+                println(&msg);
+            }
+        }
+    }
+
+    /// pid command - show current process ID
+    fn cmd_pid() {
+        match syscall_get_pid() {
+            Ok(pid) => {
+                let msg = format!("Current process ID: {}", pid);
+                println(&msg);
+            }
+            Err(e) => {
+                let msg = format!("Error getting PID: {:?}", e);
+                println(&msg);
+            }
+        }
+    }
+
+    /// spawn command - spawn N tasks and wait for them
+    fn cmd_spawn(args: &[&str]) {
+        if args.is_empty() {
+            println("Usage: spawn <count>");
+            return;
+        }
+
+        let count_str = args[0];
+        let count: usize = match count_str.parse() {
+            Ok(n) => n,
+            Err(_) => {
+                let msg = format!("Invalid count: '{}' (must be a number)", count_str);
+                println(&msg);
+                return;
+            }
+        };
+
+        if count == 0 || count > 100 {
+            println("Count must be between 1 and 100");
+            return;
+        }
+
+        let msg = format!("Spawning {} task(s)...", count);
+        println(&msg);
+
+        // Dummy entry point for tasks (would need real implementation)
+        // For now, just show that we tried
+        let mut spawned = 0;
+        for i in 1..=count {
+            // Try to create a task (this will fail in real scenario without actual task)
+            match syscall_task_create(0x1000) {
+                Ok(pid) => {
+                    let msg = format!("  Task {}: spawned as PID {}", i, pid);
+                    println(&msg);
+                    spawned += 1;
+                }
+                Err(_e) => {
+                    let msg = format!("  Task {}: spawn failed (tasks not yet running)", i);
+                    println(&msg);
+                }
+            }
+        }
+
+        let msg = format!("Spawned {} task(s)", spawned);
+        println(&msg);
     }
 
     /// Unknown command handler

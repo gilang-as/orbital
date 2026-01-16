@@ -288,6 +288,92 @@ pub fn syscall_task_wait(task_id: u64) -> SyscallResult<i64> {
     }
 }
 
+/// Syscall: get_pid - Get current process ID
+///
+/// Returns the ID of the currently running task.
+/// Useful for tasks to identify themselves.
+/// Returns: process ID (positive)
+pub fn syscall_get_pid() -> SyscallResult<u64> {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 7_i64 => result,  // syscall number 7 (SYS_GET_PID)
+            clobber_abi("C"),
+        );
+
+        if result >= 0 {
+            Ok(result as u64)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(SyscallError::NotImplemented)
+    }
+}
+
+/// Syscall: ps - List all processes
+///
+/// Writes process list to buffer in kernel.
+/// Buffer format: "PID Status\n" for each process
+/// Returns: number of bytes written
+pub fn syscall_ps(buffer: &mut [u8]) -> SyscallResult<usize> {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 8_i64 => result,  // syscall number 8 (SYS_PS)
+            in("rdi") buffer.as_mut_ptr(),
+            in("rsi") buffer.len(),
+            clobber_abi("C"),
+        );
+
+        if result >= 0 {
+            Ok(result as usize)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(SyscallError::NotImplemented)
+    }
+}
+
+/// Syscall: uptime - Get kernel uptime in seconds
+///
+/// Returns the number of seconds since kernel boot.
+/// Useful for performance measurement and debugging.
+/// Returns: uptime in seconds
+pub fn syscall_uptime() -> SyscallResult<u64> {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 9_i64 => result,  // syscall number 9 (SYS_UPTIME)
+            clobber_abi("C"),
+        );
+
+        if result >= 0 {
+            Ok(result as u64)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(SyscallError::NotImplemented)
+    }
+}
+
 /// Protocol version for IPC messages
 pub const IPC_PROTOCOL_VERSION: u32 = 1;
 

@@ -11,7 +11,7 @@
 
 use core::fmt;
 extern crate alloc;
-
+use alloc::format;
 
 /// Syscall error codes
 /// Follows Unix convention: negative values indicate errors
@@ -87,6 +87,9 @@ const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
     Some(sys_read),            // 4
     Some(sys_task_create),     // 5
     Some(sys_task_wait),       // 6
+    Some(sys_get_pid),         // 7
+    Some(sys_ps),              // 8
+    Some(sys_uptime),          // 9
     // More syscalls go here
 ];
 
@@ -99,6 +102,9 @@ pub mod nr {
     pub const SYS_READ: usize = 4;
     pub const SYS_TASK_CREATE: usize = 5;
     pub const SYS_TASK_WAIT: usize = 6;
+    pub const SYS_GET_PID: usize = 7;
+    pub const SYS_PS: usize = 8;
+    pub const SYS_UPTIME: usize = 9;
 }
 
 /// Main syscall dispatcher
@@ -408,6 +414,95 @@ fn sys_task_wait(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: u
         Some(exit_code) => Ok(exit_code as usize),
         None => Err(SysError::NotFound),
     }
+}
+
+/// sys_get_pid - Get the current process ID
+///
+/// Returns the process ID of the currently running task.
+/// This is useful for tasks to identify themselves.
+///
+/// # Arguments
+/// - None (all arguments ignored)
+///
+/// # Returns
+/// - Ok(pid): Current process ID (always > 0)
+fn sys_get_pid(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    // In a real implementation, we'd get the current process from the scheduler
+    // For now, return a placeholder (in future: retrieve from scheduler::current_process())
+    // Using 1 as placeholder since task IDs start at 1
+    Ok(crate::scheduler::current_process().unwrap_or(1) as usize)
+}
+
+/// sys_ps - List all processes
+///
+/// Returns information about all running processes.
+/// Writes process list to an output buffer (simplified version).
+///
+/// # Arguments
+/// - arg1: Pointer to output buffer (userspace memory)
+/// - arg2: Buffer size in bytes
+/// - Others: Reserved
+///
+/// # Returns
+/// - Ok(bytes_written): Number of bytes written to buffer
+/// - Err(SysError::Fault): Invalid pointer
+/// - Err(SysError::Invalid): Buffer too small
+fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    // Validate buffer is not NULL
+    if buf_ptr == 0 || buf_len == 0 {
+        return Err(SysError::Invalid);
+    }
+
+    // Get list of processes
+    let processes = crate::process::list_processes();
+    
+    // Build a simple string representation (simplified - in real kernel, would be binary format)
+    let mut output = alloc::string::String::new();
+    output.push_str("PID Status\n");
+    for (pid, status) in processes {
+        let status_str = match status {
+            crate::process::ProcessStatus::Ready => "Ready",
+            crate::process::ProcessStatus::Running => "Running",
+            crate::process::ProcessStatus::Blocked => "Blocked",
+            crate::process::ProcessStatus::Exited(_) => "Exited",
+        };
+        output.push_str(&format!("{:3} {}\n", pid, status_str));
+    }
+    
+    // Copy to userspace buffer
+    let output_bytes = output.as_bytes();
+    if output_bytes.len() > buf_len {
+        return Err(SysError::Invalid); // Buffer too small
+    }
+    
+    // In a real implementation, would validate buf_ptr is accessible from userspace
+    // For now, assume it's valid
+    unsafe {
+        core::ptr::copy_nonoverlapping(
+            output_bytes.as_ptr(),
+            buf_ptr as *mut u8,
+            output_bytes.len(),
+        );
+    }
+    
+    Ok(output_bytes.len())
+}
+
+/// sys_uptime - Get kernel uptime in seconds
+///
+/// Returns the number of seconds since kernel boot.
+/// Useful for performance measurement and debugging.
+///
+/// # Arguments
+/// - None (all arguments ignored)
+///
+/// # Returns
+/// - Ok(seconds): Number of seconds since boot
+fn sys_uptime(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    // In a real implementation, would track ticks from timer interrupt
+    // For now, return a placeholder value (100 seconds)
+    // In future: Hook to pit::ticks() or similar
+    Ok(100)
 }
 
 #[cfg(test)]
