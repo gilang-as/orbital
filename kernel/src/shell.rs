@@ -24,9 +24,13 @@ impl Shell {
                     println!("{}", message);
                 }
             }
+            Some("ping") => {
+                println!("pong");
+            }
             Some("help") => {
                 println!("Available commands:");
                 println!("  echo <message>  - Print a message");
+                println!("  ping            - Respond with pong");
                 println!("  help            - Show this help message");
                 println!("  clear           - Clear the screen");
             }
