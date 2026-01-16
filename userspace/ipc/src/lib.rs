@@ -158,6 +158,45 @@ pub fn syscall_write(fd: i32, ptr: *const u8, len: usize) -> SyscallResult<usize
     }
 }
 
+/// Syscall: read - Read from file descriptor
+/// Arguments:
+///   fd: file descriptor (0=stdin)
+///   ptr: pointer to buffer to fill
+///   len: number of bytes to read
+/// Returns: number of bytes read on success, error code on failure
+pub fn syscall_read(fd: i32, ptr: *mut u8, len: usize) -> SyscallResult<usize> {
+    // Invoke syscall 4 (SYS_READ) with:
+    //   RAX = 4 (syscall number)
+    //   RDI = fd (file descriptor)
+    //   RSI = ptr (pointer to buffer)
+    //   RDX = len (length in bytes)
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 4_i64 => result,  // syscall number 4 (SYS_READ)
+            in("rdi") fd as usize,          // first argument: fd
+            in("rsi") ptr,                  // second argument: pointer
+            in("rdx") len,                  // third argument: length
+            clobber_abi("C"),               // Tell compiler C calling convention is clobbered
+        );
+
+        if result >= 0 {
+            Ok(result as usize)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        // Non-x86_64 platforms: return not implemented
+        Err(SyscallError::NotImplemented)
+    }
+}
+
 /// Syscall: exit - Terminate process
 /// Arguments: exit_code
 /// Returns: never (or error if already exiting)
@@ -179,6 +218,40 @@ pub fn syscall_exit(exit_code: i32) -> SyscallResult<!> {
 
     // Stub: panic for now
     panic!("exit syscall not yet implemented")
+}
+
+/// Syscall: task_create - Create a new process/task
+///
+/// Creates a lightweight process/task managed by the kernel.
+/// Arguments: entry_point (function address)
+/// Returns: process ID (positive) on success, error otherwise
+pub fn syscall_task_create(entry_point: usize) -> SyscallResult<u64> {
+    // Invoke syscall 5 (SYS_TASK_CREATE) with:
+    //   RAX = 5 (syscall number)
+    //   RDI = entry_point (task entry point address)
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 5_i64 => result,  // syscall number 5 (SYS_TASK_CREATE)
+            in("rdi") entry_point,          // first argument: entry point
+            clobber_abi("C"),               // Tell compiler C calling convention is clobbered
+        );
+
+        if result >= 0 {
+            Ok(result as u64)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        // Non-x86_64 platforms: return not implemented
+        Err(SyscallError::NotImplemented)
+    }
 }
 
 /// Protocol version for IPC messages

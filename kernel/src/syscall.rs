@@ -80,10 +80,12 @@ type SyscallHandler = fn(usize, usize, usize, usize, usize, usize) -> SysResult;
 /// Syscall dispatch table
 /// Maps syscall numbers to handler functions
 const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
-    Some(sys_hello),      // 0
-    Some(sys_log),        // 1
-    Some(sys_write),      // 2
-    Some(sys_exit),       // 3
+    Some(sys_hello),           // 0
+    Some(sys_log),             // 1
+    Some(sys_write),           // 2
+    Some(sys_exit),            // 3
+    Some(sys_read),            // 4
+    Some(sys_task_create),     // 5
     // More syscalls go here
 ];
 
@@ -93,6 +95,8 @@ pub mod nr {
     pub const SYS_LOG: usize = 1;
     pub const SYS_WRITE: usize = 2;
     pub const SYS_EXIT: usize = 3;
+    pub const SYS_READ: usize = 4;
+    pub const SYS_TASK_CREATE: usize = 5;
 }
 
 /// Main syscall dispatcher
@@ -270,6 +274,100 @@ fn sys_exit(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize,
 
     // For now, return not implemented
     Err(SysError::NotImplemented)
+}
+
+/// sys_read - Read from file descriptor
+///
+/// Simple read syscall for input. Currently supports:
+/// - fd=0 (stdin): reads from kernel input buffer
+/// - Other fds: returns BadFd
+///
+/// Arguments:
+///   arg1: file descriptor (0=stdin, others invalid)
+///   arg2: pointer to buffer (from userspace)
+///   arg3: number of bytes to read
+///   other arguments: unused
+///
+/// Returns:
+///   Success: number of bytes read
+///   Failure: negative error code (BadFd, Invalid, Fault)
+///
+/// Safety:
+/// - Validates fd (must be 0 for stdin)
+/// - Validates buffer length (1-4096)
+/// - Validates pointer is not NULL
+/// - Uses safe memory copy from kernel buffer to userspace
+fn sys_read(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    let fd = arg1;
+    let ptr = arg2 as *mut u8;
+    let len = arg3;
+
+    // Validate fd (only stdin=0 supported)
+    if fd != 0 {
+        return Err(SysError::BadFd);
+    }
+
+    // Validate length
+    if len == 0 {
+        return Ok(0); // Reading 0 bytes is OK, just returns immediately
+    }
+    if len > 4096 {
+        return Err(SysError::Invalid);
+    }
+
+    // Validate pointer is not NULL
+    if ptr.is_null() {
+        return Err(SysError::Fault);
+    }
+
+    // Read from kernel input buffer
+    let bytes_read = crate::input::read_input(unsafe {
+        // SAFETY: We've validated:
+        // 1. ptr is not NULL
+        // 2. len is in valid range
+        // 3. We're creating a mutable slice for writing from kernel
+        // 4. Userspace is responsible for the memory being valid
+        core::slice::from_raw_parts_mut(ptr, len)
+    });
+
+    Ok(bytes_read)
+}
+
+/// Syscall #5: Create a new process/task
+///
+/// Creates a new lightweight process with the given entry point.
+/// The task will be managed by the kernel and can be scheduled.
+///
+/// # Arguments
+/// - arg1: Entry point address (function pointer as usize)
+/// - Others: Reserved for future use
+///
+/// # Returns
+/// - Ok(pid): Process ID (positive)
+/// - Err(SysError::Invalid): Invalid entry point (NULL)
+/// - Err(SysError::Error): Too many processes or other error
+fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    let entry_point = arg1;
+
+    // Validate entry point is not NULL
+    if entry_point == 0 {
+        return Err(SysError::Invalid);
+    }
+
+    // Create the process
+    let pid = crate::process::create_process(entry_point);
+
+    if pid < 0 {
+        // Negative return value indicates error
+        match pid {
+            -1 => Err(SysError::Invalid),  // Invalid address
+            -2 => Err(SysError::Error),    // Too many processes
+            _ => Err(SysError::Error),     // Other error
+        }
+    } else {
+        // Return the process ID as success
+        Ok(pid as usize)
+    }
 }
 
 #[cfg(test)]
