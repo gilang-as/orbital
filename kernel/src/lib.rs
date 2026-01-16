@@ -17,6 +17,7 @@ pub mod serial;
 pub mod shell;
 pub mod syscall;
 pub mod task;
+pub mod tty;
 pub mod vga_buffer;
 
 pub fn init() {

@@ -153,7 +153,7 @@ fn sys_hello(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize
 /// - Validates length is within reasonable bounds (1-1024 bytes)
 /// - Uses core::ptr::copy_nonoverlapping for safe memory copy
 /// - Does NOT interpret message content (bytes are opaque to kernel)
-/// - Disables interrupts during copy to prevent context switches mid-operation
+/// - Disables interrupts during output to prevent context switches
 fn sys_log(arg1: usize, arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
     let ptr = arg1 as *const u8;
     let len = arg2;
@@ -188,21 +188,8 @@ fn sys_log(arg1: usize, arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _
         buffer.set_len(len);
     }
 
-    // Output the message via serial
-    // Use interrupts::without_interrupts to prevent interruption during output
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        // Write to serial port
-        use core::fmt::Write;
-        let mut serial = crate::serial::SERIAL1.lock();
-        // Write the raw bytes (kernel doesn't interpret content)
-        for byte in buffer.iter() {
-            // Use write_char for each byte to match serial interface
-            let _ = serial.write_char(*byte as char);
-        }
-        // Add newline for readability
-        let _ = serial.write_char('\n');
-    });
+    // Route to TTY with newline for kernel logging
+    crate::tty::tty_write_with_newline(&buffer);
 
     // Return number of bytes written
     Ok(len)
@@ -260,17 +247,9 @@ fn sys_write(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, 
         buffer.set_len(len);
     }
 
-    // Output the data via serial
-    use x86_64::instructions::interrupts;
-    interrupts::without_interrupts(|| {
-        use core::fmt::Write;
-        let mut serial = crate::serial::SERIAL1.lock();
-        for byte in buffer.iter() {
-            let _ = serial.write_char(*byte as char);
-        }
-        // Add newline for consistency with sys_log
-        let _ = serial.write_char('\n');
-    });
+    // Route to TTY device (both fd=1 and fd=2 go through same backend)
+    // No newline added to preserve exact output semantics
+    crate::tty::tty_write(&buffer);
 
     // Return number of bytes written
     Ok(len)
