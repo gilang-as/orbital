@@ -83,15 +83,18 @@ impl TaskContext {
     /// Create a new context for a task starting at entry_point
     /// Stack pointer is set to the top of the stack (grows downward)
     pub fn new(entry_point: u64, stack_top: u64) -> Self {
+        // Initialize stack with the task entry wrapper
+        let rsp = crate::task_entry::init_task_stack(stack_top, entry_point);
+        
         TaskContext {
             rax: 0,
             rbx: 0,
             rcx: 0,
             rdx: 0,
             rsi: 0,
-            rdi: 0,
+            rdi: entry_point,    // Task function pointer in RDI for entry wrapper
             rbp: stack_top,      // Frame pointer at stack top
-            rsp: stack_top,      // Stack pointer at top (grows down)
+            rsp: rsp,            // Stack pointer adjusted for entry wrapper
             r8: 0,
             r9: 0,
             r10: 0,
@@ -100,7 +103,7 @@ impl TaskContext {
             r13: 0,
             r14: 0,
             r15: 0,
-            rip: entry_point,    // Start at entry point
+            rip: crate::task_entry::get_task_entry_point(),  // Entry wrapper RIP
             rflags: 0x200,       // Interrupt flag enabled (0x200)
         }
     }
@@ -380,5 +383,29 @@ mod tests {
     fn test_invalid_entry_point() {
         let pid = create_process(0); // NULL pointer
         assert_eq!(pid, -1);
+    }
+
+    #[test]
+    fn test_task_context_initialization() {
+        // Test that TaskContext is properly initialized for task entry
+        let stack_top = 0x8000u64;
+        let entry_point = 0x1000u64;
+        
+        let ctx = TaskContext::new(entry_point, stack_top);
+        
+        // Verify RIP points to entry point wrapper
+        assert!(ctx.rip > 0);
+        
+        // Verify RDI contains task function pointer
+        assert_eq!(ctx.rdi, entry_point);
+        
+        // Verify RBP at stack top
+        assert_eq!(ctx.rbp, stack_top);
+        
+        // Verify RSP is adjusted for stack frame
+        assert!(ctx.rsp < stack_top);
+        
+        // Verify interrupts are enabled (0x200 = IF flag)
+        assert_eq!(ctx.rflags, 0x200);
     }
 }

@@ -272,16 +272,30 @@ fn sys_write(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, 
 ///   arg1: exit code
 /// Returns: never (or error if already exiting)
 fn sys_exit(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
-    let _exit_code = arg1;
+    let exit_code = arg1 as i64;
 
-    // TODO: In full implementation, would:
-    // 1. Mark current task as exiting
-    // 2. Free task resources
-    // 3. Reschedule to next task
-    // 4. Never return to userspace
+    // Get current process ID from scheduler
+    if let Some(current_pid) = crate::scheduler::current_process() {
+        // Mark process as exited with the given exit code
+        crate::process::set_process_status(
+            current_pid,
+            crate::process::ProcessStatus::Exited(exit_code),
+        );
+        
+        // Reschedule to next process
+        let (_current, next_pid) = crate::scheduler::schedule();
+        
+        // Switch to next process
+        if let Some(next) = next_pid {
+            crate::context_switch::context_switch(Some(current_pid), Some(next));
+        }
+        
+        // If no next process, halt
+        crate::hlt_loop();
+    }
 
-    // For now, return not implemented
-    Err(SysError::NotImplemented)
+    // If no current process, return error
+    Err(SysError::NotFound)
 }
 
 /// sys_read - Read from file descriptor
