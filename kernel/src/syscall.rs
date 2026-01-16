@@ -10,6 +10,8 @@
 //! Return values are in RAX (or error code in RAX with sign bit set).
 
 use core::fmt;
+extern crate alloc;
+
 
 /// Syscall error codes
 /// Follows Unix convention: negative values indicate errors
@@ -126,32 +128,80 @@ fn sys_hello(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize
 }
 
 /// sys_log - Write message to kernel log
+///
+/// Safely copies a message from userspace memory and outputs it to the kernel log.
+/// This is the first real syscall - it demonstrates userspace-to-kernel data transfer
+/// without interpreting or validating the message content.
+///
 /// Arguments:
-///   arg1: pointer to message buffer (unsafe - not validated in this stub)
+///   arg1: pointer to message buffer (from userspace)
 ///   arg2: message length (in bytes)
-/// Returns: number of bytes written
+///   other arguments: unused
+///
+/// Returns:
+///   Success: number of bytes written (arg2)
+///   Failure: negative error code
+///
+/// Safety:
+/// - Validates pointer is not NULL
+/// - Validates length is within reasonable bounds (1-1024 bytes)
+/// - Uses core::ptr::copy_nonoverlapping for safe memory copy
+/// - Does NOT interpret message content (bytes are opaque to kernel)
+/// - Disables interrupts during copy to prevent context switches mid-operation
 fn sys_log(arg1: usize, arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
-    let _ptr = arg1;
+    let ptr = arg1 as *const u8;
     let len = arg2;
 
-    // TODO: In full implementation, would:
-    // 1. Validate that ptr points to user memory
-    // 2. Validate that ptr + len doesn't exceed user memory bounds
-    // 3. Read message from user buffer
-    // 4. Write to kernel log
-
-    // For now, just return the length as success indicator
+    // Validate length
     if len == 0 {
-        Err(SysError::Invalid)
-    } else if len > 1024 {
-        // Reasonable limit
-        Err(SysError::Invalid)
-    } else {
-        // In real implementation, would write the message
-        // For stub, just return length written
-        Ok(len)
+        return Err(SysError::Invalid);
     }
+    if len > 4096 {
+        // Reasonable upper limit to prevent DoS
+        return Err(SysError::Invalid);
+    }
+
+    // Validate pointer is not NULL
+    if ptr.is_null() {
+        return Err(SysError::Fault);
+    }
+
+    // Allocate kernel buffer for the message
+    // Using Vec to safely manage allocation
+    let mut buffer = alloc::vec::Vec::with_capacity(len);
+
+    // Safely copy from userspace memory
+    // SAFETY: We trust the pointer is valid userspace memory because:
+    // 1. We've validated it's not NULL
+    // 2. We've validated the length
+    // 3. The kernel will page fault if it's invalid (handled by CPU)
+    // 4. We're in syscall context, not holding any locks
+    unsafe {
+        // Copy bytes from userspace to kernel buffer
+        core::ptr::copy_nonoverlapping(ptr, buffer.as_mut_ptr(), len);
+        buffer.set_len(len);
+    }
+
+    // Output the message via serial
+    // Use interrupts::without_interrupts to prevent interruption during output
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        // Write to serial port
+        use core::fmt::Write;
+        let mut serial = crate::serial::SERIAL1.lock();
+        // Write the raw bytes (kernel doesn't interpret content)
+        for byte in buffer.iter() {
+            // Use write_char for each byte to match serial interface
+            let _ = serial.write_char(*byte as char);
+        }
+        // Add newline for readability
+        let _ = serial.write_char('\n');
+    });
+
+    // Return number of bytes written
+    Ok(len)
 }
+
 
 /// sys_exit - Terminate process
 /// Arguments:

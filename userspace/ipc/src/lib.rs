@@ -83,26 +83,38 @@ pub fn syscall_hello(magic: u64) -> SyscallResult<u64> {
 /// Arguments:
 ///   ptr: pointer to message buffer
 ///   len: message length in bytes
-/// Returns: number of bytes written
+/// Returns: number of bytes written on success, error code on failure
 pub fn syscall_log(ptr: *const u8, len: usize) -> SyscallResult<usize> {
-    // TODO: Implement with inline assembly:
-    // unsafe {
-    //     let result: i64;
-    //     asm!("syscall",
-    //         inout("rax") 1usize => result,  // syscall number 1
-    //         in("rdi") ptr,
-    //         in("rsi") len,
-    //         clobber_abi("C"),
-    //     );
-    //     if result >= 0 {
-    //         Ok(result as usize)
-    //     } else {
-    //         Err(SyscallError::from_return_value(result).unwrap())
-    //     }
-    // }
+    // Invoke syscall 1 (SYS_LOG) with:
+    //   RAX = 1 (syscall number)
+    //   RDI = ptr (first argument)
+    //   RSI = len (second argument)
+    //
+    // Return value in RAX (negative = error, positive = bytes written)
 
-    // Stub: return error for now
-    Err(SyscallError::NotImplemented)
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 1_i64 => result,  // syscall number 1 (SYS_LOG)
+            in("rdi") ptr,                  // first argument: pointer
+            in("rsi") len,                  // second argument: length
+            clobber_abi("C"),               // Tell compiler C calling convention is clobbered
+        );
+
+        if result >= 0 {
+            Ok(result as usize)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        // Non-x86_64 platforms: return not implemented
+        Err(SyscallError::NotImplemented)
+    }
 }
 
 /// Syscall: exit - Terminate process
