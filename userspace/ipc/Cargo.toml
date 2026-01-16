@@ -1,8 +1,8 @@
 [package]
 name = "orbital-ipc"
-version.workspace = true
-authors.workspace = true
-edition.workspace = true
+version = "0.1.0"
+authors = ["Gilang Adi S <contact@gilang.dev>"]
+edition = "2021"
 
 [lib]
 
