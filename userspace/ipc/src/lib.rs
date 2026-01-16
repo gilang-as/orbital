@@ -29,6 +29,7 @@ pub enum SyscallError {
     PermissionDenied,
     NotFound,
     Error,
+    BadFd,
 }
 
 impl SyscallError {
@@ -41,6 +42,7 @@ impl SyscallError {
             -4 => Some(SyscallError::PermissionDenied),
             -5 => Some(SyscallError::NotFound),
             -6 => Some(SyscallError::Error),
+            -9 => Some(SyscallError::BadFd),
             _ => None,
         }
     }
@@ -100,6 +102,45 @@ pub fn syscall_log(ptr: *const u8, len: usize) -> SyscallResult<usize> {
             inout("rax") 1_i64 => result,  // syscall number 1 (SYS_LOG)
             in("rdi") ptr,                  // first argument: pointer
             in("rsi") len,                  // second argument: length
+            clobber_abi("C"),               // Tell compiler C calling convention is clobbered
+        );
+
+        if result >= 0 {
+            Ok(result as usize)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        // Non-x86_64 platforms: return not implemented
+        Err(SyscallError::NotImplemented)
+    }
+}
+
+/// Syscall: write - Write to file descriptor
+/// Arguments:
+///   fd: file descriptor (1=stdout, 2=stderr)
+///   ptr: pointer to data buffer
+///   len: number of bytes to write
+/// Returns: number of bytes written on success, error code on failure
+pub fn syscall_write(fd: i32, ptr: *const u8, len: usize) -> SyscallResult<usize> {
+    // Invoke syscall 2 (SYS_WRITE) with:
+    //   RAX = 2 (syscall number)
+    //   RDI = fd (file descriptor)
+    //   RSI = ptr (pointer to data)
+    //   RDX = len (length in bytes)
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 2_i64 => result,  // syscall number 2 (SYS_WRITE)
+            in("rdi") fd as usize,          // first argument: fd
+            in("rsi") ptr,                  // second argument: pointer
+            in("rdx") len,                  // third argument: length
             clobber_abi("C"),               // Tell compiler C calling convention is clobbered
         );
 

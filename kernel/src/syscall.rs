@@ -30,6 +30,8 @@ pub enum SysError {
     NotFound = -5,
     /// Generic kernel error
     Error = -6,
+    /// Bad file descriptor
+    BadFd = -9,
 }
 
 impl SysError {
@@ -48,6 +50,7 @@ impl SysError {
             -4 => Some(SysError::PermissionDenied),
             -5 => Some(SysError::NotFound),
             -6 => Some(SysError::Error),
+            -9 => Some(SysError::BadFd),
             _ => None,
         }
     }
@@ -62,6 +65,7 @@ impl fmt::Display for SysError {
             SysError::PermissionDenied => write!(f, "Permission denied"),
             SysError::NotFound => write!(f, "Not found"),
             SysError::Error => write!(f, "Kernel error"),
+            SysError::BadFd => write!(f, "Bad file descriptor"),
         }
     }
 }
@@ -78,7 +82,8 @@ type SyscallHandler = fn(usize, usize, usize, usize, usize, usize) -> SysResult;
 const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
     Some(sys_hello),      // 0
     Some(sys_log),        // 1
-    Some(sys_exit),       // 2
+    Some(sys_write),      // 2
+    Some(sys_exit),       // 3
     // More syscalls go here
 ];
 
@@ -86,7 +91,8 @@ const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
 pub mod nr {
     pub const SYS_HELLO: usize = 0;
     pub const SYS_LOG: usize = 1;
-    pub const SYS_EXIT: usize = 2;
+    pub const SYS_WRITE: usize = 2;
+    pub const SYS_EXIT: usize = 3;
 }
 
 /// Main syscall dispatcher
@@ -202,6 +208,73 @@ fn sys_log(arg1: usize, arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _
     Ok(len)
 }
 
+/// sys_write - Write to file descriptor
+///
+/// UNIX-style write syscall that allows userspace to write to stdout (fd=1) or stderr (fd=2).
+/// This introduces a simple file descriptor abstraction while keeping the kernel minimal.
+///
+/// Arguments:
+///   arg1: file descriptor (1=stdout, 2=stderr, others invalid)
+///   arg2: pointer to buffer (from userspace)
+///   arg3: number of bytes to write
+///   other arguments: unused
+///
+/// Returns:
+///   Success: number of bytes written (arg3)
+///   Failure: negative error code (BadFd, Invalid, Fault)
+///
+/// Safety:
+/// - Validates fd (must be 1 or 2)
+/// - Validates buffer length (same as sys_log: 1-4096)
+/// - Validates pointer is not NULL
+/// - Uses safe memory copy
+fn sys_write(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+    let fd = arg1;
+    let ptr = arg2 as *const u8;
+    let len = arg3;
+
+    // Validate fd
+    if fd != 1 && fd != 2 {
+        return Err(SysError::BadFd);
+    }
+
+    // Validate length (same as sys_log)
+    if len == 0 {
+        return Err(SysError::Invalid);
+    }
+    if len > 4096 {
+        return Err(SysError::Invalid);
+    }
+
+    // Validate pointer is not NULL
+    if ptr.is_null() {
+        return Err(SysError::Fault);
+    }
+
+    // Allocate kernel buffer for the data
+    let mut buffer = alloc::vec::Vec::with_capacity(len);
+
+    // Safely copy from userspace memory
+    unsafe {
+        core::ptr::copy_nonoverlapping(ptr, buffer.as_mut_ptr(), len);
+        buffer.set_len(len);
+    }
+
+    // Output the data via serial
+    use x86_64::instructions::interrupts;
+    interrupts::without_interrupts(|| {
+        use core::fmt::Write;
+        let mut serial = crate::serial::SERIAL1.lock();
+        for byte in buffer.iter() {
+            let _ = serial.write_char(*byte as char);
+        }
+        // Add newline for consistency with sys_log
+        let _ = serial.write_char('\n');
+    });
+
+    // Return number of bytes written
+    Ok(len)
+}
 
 /// sys_exit - Terminate process
 /// Arguments:
@@ -262,9 +335,37 @@ mod tests {
     }
 
     #[test]
+    fn test_syscall_write() {
+        // Valid fd (1 = stdout)
+        let result = sys_write(1, 0x1000, 10, 0, 0, 0);
+        assert_eq!(result, Ok(10));
+
+        // Valid fd (2 = stderr)
+        let result = sys_write(2, 0x1000, 10, 0, 0, 0);
+        assert_eq!(result, Ok(10));
+
+        // Invalid fd (3)
+        let result = sys_write(3, 0x1000, 10, 0, 0, 0);
+        assert_eq!(result, Err(SysError::BadFd));
+
+        // Zero length
+        let result = sys_write(1, 0x1000, 0, 0, 0, 0);
+        assert_eq!(result, Err(SysError::Invalid));
+
+        // Too long
+        let result = sys_write(1, 0x1000, 5000, 0, 0, 0);
+        assert_eq!(result, Err(SysError::Invalid));
+
+        // NULL pointer
+        let result = sys_write(1, 0, 10, 0, 0, 0);
+        assert_eq!(result, Err(SysError::Fault));
+    }
+
+    #[test]
     fn test_error_codes() {
         assert_eq!(SysError::Invalid.to_return_value(), -1);
         assert_eq!(SysError::NotImplemented.to_return_value(), -2);
         assert_eq!(SysError::Fault.to_return_value(), -3);
+        assert_eq!(SysError::BadFd.to_return_value(), -9);
     }
 }
