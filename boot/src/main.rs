@@ -23,6 +23,8 @@ fn boot_main(boot_info: &'static BootInfo) -> ! {
     println!(" | (_) | '_| '_ \\ |  _/ _` | |");
     println!("  \\___/|_| |_.__/_|\\__\\__,_|_|");
     println!("                              ");
+    println!("Version 0.2.0 - Phase 2: Task Execution");
+    println!("");
     orbital_kernel::init();
 
     let phys_mem_offset = VirtAddr::new(boot_info.physical_memory_offset);
