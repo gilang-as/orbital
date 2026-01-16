@@ -46,6 +46,9 @@ pub async fn terminal() {
                                 input_line.push(character);
                                 print!("{}", character);
                                 update_cursor();
+                                
+                                // Queue character for userspace to read via sys_read
+                                crate::input::add_input_char(character as u8);
                             }
                         }
                     }
