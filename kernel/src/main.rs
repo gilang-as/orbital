@@ -32,7 +32,9 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(example_task()));
-    executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
+    // Disabled: kernel terminal task interferes with clean output
+    // Use userspace CLI (orbital-cli) instead for interactive shell
+    // executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
     executor.run();
 }
 
