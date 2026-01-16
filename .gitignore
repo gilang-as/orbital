@@ -1,4 +1,22 @@
+# Build and compilation artifacts
 /target
+**/target
+*.rs.bk
 **/*.rs.bk
 
+# Cargo lock files (except root)
+**/Cargo.lock
+
+# IDE and editor
 .vscode
+.idea
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Environment
+.env
+.env.local
