@@ -22,6 +22,7 @@ pub mod shell;
 pub mod syscall;
 pub mod task;
 pub mod task_entry;
+pub mod tasks;
 pub mod tty;
 pub mod vga_buffer;
 
