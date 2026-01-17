@@ -119,52 +119,13 @@ pub fn dispatch_syscall(
     arg6: usize,
 ) -> i64 {
     // Dispatch to handler or return error
-    let result = if let Some(handler) = SYSCALL_TABLE.get(syscall_nr).and_then(|h| h.as_ref()) {
+    if let Some(handler) = SYSCALL_TABLE.get(syscall_nr).and_then(|h| h.as_ref()) {
         match handler(arg1, arg2, arg3, arg4, arg5, arg6) {
             Ok(ret) => ret as i64,
             Err(e) => e.to_return_value(),
         }
     } else {
         SysError::NotImplemented.to_return_value()
-    };
-    
-    // Check if preemption is needed after syscall completion
-    // This implements preemption point #2: On syscall completion
-    check_preemption_on_syscall_completion(syscall_nr);
-    
-    result
-}
-
-/// Check if preemption is needed after syscall completion
-/// Called after every syscall to see if the current task's quantum has expired
-/// If so, performs a context switch to the next ready task
-fn check_preemption_on_syscall_completion(syscall_nr: usize) {
-    // Skip preemption check for sys_exit (it handles its own switching)
-    if syscall_nr == nr::SYS_EXIT {
-        return;
-    }
-    
-    // Check if current task's quantum is about to expire or has expired
-    // This gives sys_read, sys_write, etc. a chance to preempt fairly
-    let need_switch = crate::scheduler::check_quantum_expired();
-    
-    if need_switch {
-        if let Some(current_pid) = crate::scheduler::current_process() {
-            // Mark current task as ready for re-scheduling
-            crate::process::set_process_status(
-                current_pid,
-                crate::process::ProcessStatus::Ready,
-            );
-            
-            // Get next task from scheduler
-            let (_current, next_pid) = crate::scheduler::schedule();
-            
-            // Switch to next task if available
-            if let Some(next) = next_pid {
-                crate::context_switch::context_switch(Some(current_pid), Some(next));
-                // Note: This might not return if we're switching away
-            }
-        }
     }
 }
 
@@ -390,28 +351,6 @@ fn sys_read(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _
         // 4. Userspace is responsible for the memory being valid
         core::slice::from_raw_parts_mut(ptr, len)
     });
-
-    // Blocking operation handling (Preemption point #3)
-    // If no data available and we just blocked, yield to other tasks
-    if bytes_read == 0 {
-        // No data available - this is effectively a blocking operation
-        if let Some(current_pid) = crate::scheduler::current_process() {
-            // Mark process as blocked (waiting for I/O)
-            crate::process::set_process_status(
-                current_pid,
-                crate::process::ProcessStatus::Blocked,
-            );
-            
-            // Schedule next ready task
-            let (_current, next_pid) = crate::scheduler::schedule();
-            
-            // Switch to next task if available
-            if let Some(next) = next_pid {
-                // Perform context switch - we'll resume when input arrives
-                crate::context_switch::context_switch(Some(current_pid), Some(next));
-            }
-        }
-    }
 
     Ok(bytes_read)
 }
