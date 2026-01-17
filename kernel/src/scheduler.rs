@@ -148,6 +148,15 @@ pub fn schedule() -> (Option<u64>, Option<u64>) {
     sched.schedule()
 }
 
+/// Check if current task's quantum has expired
+/// Used by syscalls to determine if preemption is needed
+/// Does NOT reset the counter - that's done on actual switch
+pub fn check_quantum_expired() -> bool {
+    let scheduler = get_or_init_scheduler();
+    let sched = scheduler.lock();
+    sched.time_counter >= sched.time_quantum
+}
+
 /// Get elapsed time in seconds since kernel boot
 /// Timer frequency is approximately 100 Hz, so divide ticks by 100
 pub fn get_elapsed_seconds() -> u64 {
