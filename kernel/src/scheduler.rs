@@ -158,10 +158,28 @@ pub fn check_quantum_expired() -> bool {
 }
 
 /// Get elapsed time in seconds since kernel boot
-/// Timer frequency is approximately 100 Hz, so divide ticks by 100
 pub fn get_elapsed_seconds() -> u64 {
     let ticks = ELAPSED_TICKS.lock();
-    *ticks / 100  // Convert ticks to seconds (100 Hz = 100 ticks/sec)
+    *ticks / 100  // 100 Hz timer = divide by 100 to get seconds
+}
+
+/// Run the kernel scheduler main loop
+/// This is the main loop for the pure kernel scheduler (no async executor)  
+/// It never returns - it runs forever handling scheduling
+pub fn run_kernel_scheduler() -> ! {
+    // Schedule the first process
+    let (_current, first_process) = schedule();
+    
+    match first_process {
+        Some(first_pid) => {
+            // Set up the initial process
+            unsafe { crate::context_switch::restore_context(&crate::process::get_process_context(first_pid).unwrap()) }
+        }
+        None => {
+            // No processes to run - just halt forever
+            crate::hlt_loop();
+        }
+    }
 }
 
 #[cfg(test)]
