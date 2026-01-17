@@ -24,7 +24,6 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
-use crate::println;
 
 const TASK_STACK_SIZE: usize = 4096; // 4KB per task
 

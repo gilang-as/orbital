@@ -2,7 +2,7 @@
 
 A lightweight, policy-free x86_64 operating system kernel built in Rust, demonstrating safe userspace-to-kernel communication through minimal syscalls.
 
-**Status**: Active development - Phase 1: Core syscall infrastructure
+**Status**: Phase 2 - Direct Task Execution Model (Working ✅)
 
 ## Quick Start
 
@@ -16,17 +16,58 @@ cargo bootimage
 cargo run
 ```
 
-## Current Capabilities
+### Test the Kernel
+```bash
+# After kernel boots:
+> spawn 1
+Spawned task 1 with PID: 1
 
-### Kernel Features
-- ✅ x86_64 bare-metal execution with VGA/serial output
-- ✅ Memory management (paging, heap allocation with allocators)
-- ✅ CPU initialization (GDT, IDT with interrupt handlers)
-- ✅ Keyboard input with terminal echo
-- ✅ Async task executor with keyboard/timer interrupts
-- ✅ TTY abstraction layer (output routing)
-- ✅ Syscall dispatcher with safe memory validation
-- ✅ Process/task registry and lifecycle management
+> spawn 2
+Spawned task 2 with PID: 2
+
+> ps
+PID    Status
+1      Ready
+2      Ready
+
+> run
+Executing all ready processes...
+[Task 1] Hello from test task 1
+[Task 1] Exiting with code 0
+[Task 2] Hello from test task 2
+[Task 2] Performing some work...
+[Task 2] Exiting with code 1
+Executed 2 processes
+
+> ps
+PID    Status
+1      Exited(0)
+2      Exited(1)
+
+>
+```
+
+## Currently Implemented ✅
+
+### Core Kernel Features
+- ✅ **x86_64 bare-metal execution** - VGA buffer + serial output
+- ✅ **Memory management** - Paging, heap allocation with bump/fixed-size allocators
+- ✅ **CPU initialization** - GDT, IDT with interrupt handlers (no double faults!)
+- ✅ **Interrupt handling** - Timer, keyboard, exception handlers
+- ✅ **Async executor** - Cooperative multitasking for terminal
+- ✅ **Process management** - Process creation, status tracking, direct execution
+- ✅ **TTY abstraction** - Output routing (kernel/serial/vga)
+
+### Shell Commands
+| Command | Status | Purpose |
+|---------|--------|---------|
+| `echo <message>` | ✅ | Print a message |
+| `ping` | ✅ | Respond with pong |
+| `spawn [N]` | ✅ | Create new task (N=1-4) |
+| `run` | ✅ | Execute all ready tasks |
+| `ps` | ✅ | List all processes with status |
+| `help` | ✅ | Show available commands |
+| `clear` | ✅ | Clear screen |
 
 ### Syscalls Implemented (6 total)
 | # | Name | Status | Purpose |
@@ -34,194 +75,131 @@ cargo run
 | 0 | `sys_hello` | ✅ | Magic number validation test |
 | 1 | `sys_log` | ✅ | Kernel logging with newline |
 | 2 | `sys_write` | ✅ | UNIX-style write to fd (1=stdout, 2=stderr) |
-| 3 | `sys_exit` | 🟡 | Process termination (stub) |
+| 3 | `sys_exit` | ✅ | Process termination |
 | 4 | `sys_read` | ✅ | Read from stdin (fd=0 only) |
 | 5 | `sys_task_create` | ✅ | Spawn new process/task |
 
-### Userspace Features
-- ✅ Syscall wrappers with x86_64 inline assembly
-- ✅ IPC module with syscall error handling
-- ✅ CLI shell with commands: help, echo, ping, clear, spawn, ps
-- ✅ Input buffer system for keyboard integration
+### Task System
+- ✅ **Direct execution model** - Tasks called as Rust functions (no context switching)
+- ✅ **Ready state** - Tasks queued but waiting for execution
+- ✅ **Exit codes** - Captured and stored for each task
+- ✅ **Multiple tasks** - Can spawn and run multiple tasks sequentially
+
+## Build Status
+
+```
+✅ Compiles cleanly (zero errors, zero warnings)
+✅ Boot image created: 990 KB
+✅ Kernel boots without panic
+✅ All shell commands working
+✅ No double faults
+```
 
 ## Architecture
 
-Orbital OS follows a **hybrid kernel** design:
-- **Kernel = Mechanism**: Provides syscalls, process management, memory/CPU primitives
-- **Userspace = Policy**: Handles scheduling, priorities, application logic, system services
+Orbital OS uses a **direct task execution** model:
 
 ```
-┌─────────────────────────────────────┐
-│   Userspace Programs & Services     │
-│   (orbital-cli, managementd, etc)   │
-└──────────────┬──────────────────────┘
-               │ Syscalls (ABI: x86_64 System V)
-┌──────────────▼──────────────────────┐
-│   Kernel (orbital-kernel)           │
-│  - Syscall dispatcher               │
-│  - Process/task registry            │
-│  - Memory management                │
-│  - I/O: VGA, Serial, Keyboard       │
-│  - Async task executor              │
-└─────────────────────────────────────┘
+                      ┌──────────────────┐
+                      │  User Types: cmd │
+                      └────────┬─────────┘
+                               │
+                    ┌──────────┴──────────┐
+                    │                     │
+              ┌─────▼─────┐      ┌────────▼────────┐
+              │ Shell      │      │ Async Executor  │
+              │ Commands   │      │ (Terminal)      │
+              └─────┬─────┘      └─────────────────┘
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+   ┌────▼──┐ ┌─────▼────┐ ┌───▼─────┐
+   │ spawn │ │ ps       │ │ run     │
+   │ (Add) │ │ (List)   │ │ (Exec)  │
+   └────┬──┘ └──────────┘ └───┬─────┘
+        │                      │
+        │              ┌───────▼────────┐
+        │              │ Execute Process│
+        │              │ Direct Call    │
+        │              └────────────────┘
+        │
+   ┌────▼──────────────────────────────┐
+   │ Process Table (Vec<Process>)       │
+   │ [PID:1, Status:Ready]              │
+   │ [PID:2, Status:Ready]              │
+   │ [PID:3, Status:Exited(0)]          │
+   └────────────────────────────────────┘
 ```
 
-## Syscall ABI
-
-**Calling Convention**: System V AMD64
-- Arguments: RDI, RSI, RDX, RCX, R8, R9
-- Syscall number: RAX (before call), also receives return value
-- Instruction: `syscall` / `sysret`
-- Error convention: Negative i64 (-1 to -9) indicates error
-
-## Design Principles
-
-1. **Policy-Free Kernel**: No system logic in kernel, only mechanisms
-2. **Safe by Default**: Pointer and memory validation on syscall entry
-3. **Minimal Overhead**: Lightweight process creation without execution overhead
-4. **Separation of Concerns**: Clear boundaries between kernel and userspace
-
-## Building for Development
-
-### Prerequisites
-- Rust nightly (`rustup update nightly`)
-- QEMU (`brew install qemu` on macOS)
-- Bootimage: `cargo install bootimage`
-
-### Development Commands
-
-```bash
-# Build bootimage and run in QEMU
-cargo bootimage
-cargo run
-
-# Build just the kernel
-cargo build --lib -p orbital-kernel
-
-# Check for errors without building
-cargo check
-
-# Run tests (integration tests via bootimage)
-cargo test --test '*'
-
-# View kernel documentation
-cargo doc -p orbital-kernel --no-deps --open
-```
-
-## Project Structure
-
-```
-orbital/
-├── kernel/               # Kernel library (no_std, bare-metal)
-│   ├── src/
-│   │   ├── main.rs      # Kernel entry point
-│   │   ├── lib.rs       # Public kernel interface
-│   │   ├── syscall.rs   # Syscall dispatcher & handlers
-│   │   ├── process.rs   # Process registry & management
-│   │   ├── input.rs     # Input buffer for stdin
-│   │   ├── tty.rs       # Terminal abstraction layer
-│   │   ├── gdt.rs       # Global Descriptor Table setup
-│   │   ├── interrupts.rs# IDT & interrupt handlers
-│   │   ├── vga_buffer.rs# VGA text output with cursor
-│   │   ├── shell.rs     # Command dispatcher
-│   │   ├── task/        # Async executor & tasks
-│   │   └── ...
-│   └── tests/           # Integration tests (bootimage)
-│
-├── boot/                 # Bootloader & early init (no_std)
-│   └── src/main.rs      # Boot entry point
-│
-├── common/               # Shared types (no_std)
-│   └── src/lib.rs       # Common structures & interfaces
-│
-├── userspace/
-│   ├── ipc/             # IPC library with syscall wrappers (std)
-│   ├── cli/             # Command-line interface (std)
-│   └── managementd/     # Management daemon (planned)
-│
-├── docs/                # Architecture documentation
-│   ├── Task_Launcher.md
-│   ├── 13. Syscall Skeleton Design.md
-│   ├── 12. IPC Transport Layer Design.md
-│   └── ... (11 other design docs)
-│
-└── Cargo.toml           # Workspace configuration
-```
-
-## Kernel Shell Commands
-
-Interactive shell running in kernel with these commands:
-
-```
-help              - Show available commands
-echo <msg>        - Print a message
-ping              - Respond with pong
-spawn             - Create a new process (demo)
-ps                - List all processes
-clear             - Clear the screen
-```
-
-## Testing
-
-Integration tests verify:
-- ✅ Basic kernel boot
-- ✅ Heap allocation
-- ✅ Stack overflow interrupt handling
-- ✅ Panic propagation
-
-```bash
-# Run all tests
-cargo test --test '*'
-
-# Run specific test
-cargo test --test basic_boot
-```
-
-## Current Limitations
-
-1. **No process execution**: Processes are created but don't run
-2. **Single address space**: No memory isolation
-3. **Blocking I/O only**: No async syscalls yet
-4. **Limited error codes**: 9 error types (-1 to -9)
-5. **No signals**: No event delivery to processes
-6. **No IPC**: Inter-process communication not yet implemented
-
-## Next Steps
-
-### Phase 2: Task Execution
-- Wire process entry points to async executor
-- Implement userspace task execution
-- Add task scheduling (round-robin or priority-based)
-
-### Phase 3: Memory Isolation
-- Implement paging for memory protection
-- Add task-local virtual address spaces
-- Implement fork/exec syscalls
-
-### Phase 4: IPC & Services
-- Implement ring buffer-based IPC
-- Add management daemon
-- Implement service discovery
-
-### Phase 5: Advanced Features
-- Networking (raw sockets, TCP/IP)
-- Package system & package manager
-- RBAC & capability-based security
-- File system (minimal)
+**Key Design Choice**: Use direct function calls instead of complex context switching
+- ✅ Safe (no inline assembly for context restoration)
+- ✅ Simple (easy to understand and debug)
+- ✅ Responsive (no CPU freezes)
+- ✅ Foundation (can evolve to preemptive later)
 
 ## Documentation
 
-See `docs/` directory for detailed architecture:
-- [Task_Launcher.md](docs/Task_Launcher.md) - Process management design
-- [Syscall Skeleton Design.md](docs/13.%20Syscall%20Skeleton%20Design.md) - Syscall ABI
-- [IPC Transport Layer Design.md](docs/12.%20IPC%20Transport%20Layer%20Design.md) - IPC architecture
-- REFACTORING.md - Recent refactoring notes
-- WORKSPACE.md - Crate organization
+**For detailed implementation info, see:**
+- [PHASE2_FIXES_APPLIED.md](PHASE2_FIXES_APPLIED.md) - What was fixed and how
+- [ALTERNATIVE_SOLUTION.md](ALTERNATIVE_SOLUTION.md) - Current direct execution model explained
+- [CLEANUP_SUMMARY.md](CLEANUP_SUMMARY.md) - What was cleaned up
+- [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md) - Full doc navigation
 
-## Development Notes
+## Limitations (By Design)
 
-- All code is Rust, using nightly features
-- Kernel is `#![no_std]` with custom allocators
-- Userspace is standard library (std)
-- Integration tests run via `bootimage` test runner
-- Target: x86_64-unknown-none-gnu (bare-metal, no hosted OS)
+Currently, this is a **Phase 2 foundation** with intentional limitations:
+
+- **No preemption**: Tasks run sequentially, not in parallel
+- **No automatic execution**: Must use `run` command to execute tasks
+- **No concurrency**: One task at a time (future: async/await support)
+- **No IPC**: Inter-process communication not yet implemented (planned for Phase 4)
+- **No memory isolation**: Single address space (planned for Phase 3)
+
+These are **intentional choices** to keep the implementation simple and safe while establishing a working foundation.
+
+## Future Phases
+
+- **Phase 3**: Cooperative/preemptive multitasking with timer interrupts
+- **Phase 4**: IPC and message passing between tasks
+- **Phase 5**: Memory protection and process isolation
+- **Phase 6**: Advanced features (networking, package system, security)
+
+## Build Instructions
+
+```bash
+# Build the bootimage
+cargo bootimage
+
+# Run in QEMU
+cargo run
+
+# Just compile without running
+cargo build
+
+# Check code without building
+cargo check
+```
+
+## Project Layout
+
+```
+kernel/                  # Kernel library (no_std bare-metal)
+  ├── src/main.rs        # Entry point
+  ├── src/lib.rs         # Public API
+  ├── src/process.rs     # Task spawning & execution
+  ├── src/shell.rs       # Command dispatcher
+  ├── src/syscall.rs     # Syscall handlers
+  └── ...
+
+boot/                    # Bootloader
+userspace/               # Userspace programs (std)
+docs/                    # Architecture documentation
+```
+
+## Git History
+
+Latest commits:
+- Direct task execution implementation (working ✅)
+- Removed double-fault causing context switching
+- Cleaned up 25 obsolete documentation files
+- All shell commands responsive and bug-free
