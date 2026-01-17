@@ -45,6 +45,12 @@ impl Shell {
                     println!("Unknown task index: {}. Try: spawn 1, spawn 2, spawn 3, spawn 4", task_index);
                 }
             }
+            Some("run") => {
+                // Execute all ready processes
+                println!("Executing all ready processes...");
+                let count = crate::process::execute_all_ready();
+                println!("Executed {} processes", count);
+            }
             Some("ps") => {
                 // List all processes
                 let processes = crate::process::list_processes();
@@ -58,6 +64,7 @@ impl Shell {
                 println!("  echo <message>  - Print a message");
                 println!("  ping            - Respond with pong");
                 println!("  spawn           - Create a new task");
+                println!("  run             - Execute all ready tasks");
                 println!("  ps              - List all processes");
                 println!("  help            - Show this help message");
                 println!("  clear           - Clear the screen");

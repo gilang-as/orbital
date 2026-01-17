@@ -24,7 +24,8 @@
 //!        [RIP]   <- Entry point or return address
 //! ```
 
-use crate::process::{TaskContext};
+use crate::process::TaskContext;
+use crate::println;
 
 /// Save the current CPU state to a TaskContext structure
 ///
@@ -172,36 +173,62 @@ pub unsafe fn restore_context(ctx: &TaskContext) -> ! {
     }
 }
 
-/// Perform a full context switch from current task to next task
-///
-/// # Arguments
-/// * `current_pid` - PID of the currently running task (to save context)
-/// * `next_pid` - PID of the next task to run
-///
-/// # Safety
-/// This is unsafe because it modifies all CPU state.
+/// Validate a TaskContext before context switching
+/// 
+/// This catches invalid contexts early rather than double faulting
+/// Returns true if context is valid, false otherwise
+/// Will be used when preemptive multitasking is implemented
+#[allow(dead_code)]
+fn validate_context(ctx: &TaskContext) -> bool {
+    // Check 1: Stack pointer not NULL
+    if ctx.rsp == 0 {
+        println!("ERROR: RSP is NULL (0x0)!");
+        return false;
+    }
+    
+    // Check 2: Instruction pointer not NULL
+    if ctx.rip == 0 {
+        println!("ERROR: RIP is NULL (0x0)!");
+        return false;
+    }
+    
+    // Check 3: Stack pointer in valid kernel space
+    // Kernel stacks are allocated from the heap at 0x_4444_4444_0000
+    const KERNEL_HEAP_START: u64 = 0x0000_4444_4444_0000;
+    const KERNEL_HEAP_END: u64 = 0x0000_4444_4444_0000 + (100 * 1024);  // 100 KiB heap
+    
+    if ctx.rsp < KERNEL_HEAP_START || ctx.rsp > KERNEL_HEAP_END {
+        println!("ERROR: RSP 0x{:x} outside valid heap range [0x{:x}, 0x{:x})!", 
+                 ctx.rsp, KERNEL_HEAP_START, KERNEL_HEAP_END);
+        return false;
+    }
+    
+    // Check 4: RBP should be above RSP (stack grows downward)
+    if ctx.rsp >= ctx.rbp {
+        println!("ERROR: RSP (0x{:x}) >= RBP (0x{:x}) - stack corrupted!", ctx.rsp, ctx.rbp);
+        return false;
+    }
+    
+    // Check 5: RBP - RSP shouldn't exceed max stack size
+    const MAX_STACK_SIZE: u64 = 4096 + 256;  // Allow some overflow room
+    if ctx.rbp - ctx.rsp > MAX_STACK_SIZE {
+        println!("ERROR: Stack too large (RBP - RSP = 0x{:x})!", ctx.rbp - ctx.rsp);
+        return false;
+    }
+    
+    // Check 6: RFLAGS should have interrupt flag set (IF = bit 9 = 0x200)
+    if (ctx.rflags & 0x200) == 0 {
+        println!("WARNING: Interrupt flag not set in RFLAGS (0x{:x})", ctx.rflags);
+        // This is a warning, not fatal - continue
+    }
+    
+    println!("[validate_context] VALID: RSP=0x{:x}, RIP=0x{:x}, RBP=0x{:x}", ctx.rsp, ctx.rip, ctx.rbp);
+    true
+}
+
 pub fn context_switch(current_pid: Option<u64>, next_pid: Option<u64>) {
-    // Save current context if there's a current process
-    if let Some(pid) = current_pid {
-        let ctx = save_context();
-        if let Some(mut_ref) = crate::process::get_process_mut(pid) {
-            mut_ref.update_context(ctx);
-        }
-    }
-
-    // Restore next context if there's a next process
-    if let Some(pid) = next_pid {
-        if let Some(ctx) = crate::process::get_process_context(pid) {
-            // Update process status to Running
-            crate::process::set_process_status(pid, crate::process::ProcessStatus::Running);
-            
-            // Switch to the task
-            unsafe {
-                restore_context(&ctx);
-            }
-        }
-    }
-
-    // If no next process, just halt
-    crate::hlt_loop();
+    // For now, context switching is disabled
+    // Tasks will be executed directly via execute_process(), not via context switch
+    // Just return and let the scheduler/executor continue normally
+    let _ = (current_pid, next_pid); // Suppress unused warning
 }
