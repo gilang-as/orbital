@@ -12,6 +12,10 @@ use alloc::collections::VecDeque;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
 
+/// Global elapsed time in timer ticks since kernel boot
+/// Timer frequency is approximately 100 Hz (10ms per tick)
+static ELAPSED_TICKS: spin::Mutex<u64> = spin::Mutex::new(0);
+
 /// Scheduler state
 pub struct Scheduler {
     /// Queue of ready processes waiting to run
@@ -71,6 +75,12 @@ impl Scheduler {
         }
     }
 
+    /// Increment global elapsed time (called on each timer tick)
+    fn increment_elapsed_time() {
+        let mut ticks = ELAPSED_TICKS.lock();
+        *ticks = ticks.saturating_add(1);
+    }
+
     /// Select next process to run (round-robin)
     /// Returns (previous_pid, next_pid)
     pub fn schedule(&mut self) -> (Option<u64>, Option<u64>) {
@@ -122,6 +132,9 @@ pub fn current_process() -> Option<u64> {
 /// Timer interrupt handler - call on each timer tick
 /// Returns true if context switch is needed
 pub fn timer_tick() -> bool {
+    // Increment global elapsed time
+    Scheduler::increment_elapsed_time();
+    
     let scheduler = get_or_init_scheduler();
     let mut sched = scheduler.lock();
     sched.tick()
@@ -133,6 +146,13 @@ pub fn schedule() -> (Option<u64>, Option<u64>) {
     let scheduler = get_or_init_scheduler();
     let mut sched = scheduler.lock();
     sched.schedule()
+}
+
+/// Get elapsed time in seconds since kernel boot
+/// Timer frequency is approximately 100 Hz, so divide ticks by 100
+pub fn get_elapsed_seconds() -> u64 {
+    let ticks = ELAPSED_TICKS.lock();
+    *ticks / 100  // Convert ticks to seconds (100 Hz = 100 ticks/sec)
 }
 
 #[cfg(test)]

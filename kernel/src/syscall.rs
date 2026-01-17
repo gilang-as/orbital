@@ -504,8 +504,8 @@ fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usi
 
 /// sys_uptime - Get kernel uptime in seconds
 ///
-/// Returns the number of seconds since kernel boot.
-/// Useful for performance measurement and debugging.
+/// Returns the number of seconds since kernel boot, tracked from timer interrupts.
+/// Timer frequency is ~100 Hz, so each tick represents ~10ms.
 ///
 /// # Arguments
 /// - None (all arguments ignored)
@@ -513,10 +513,8 @@ fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usi
 /// # Returns
 /// - Ok(seconds): Number of seconds since boot
 fn sys_uptime(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
-    // In a real implementation, would track ticks from timer interrupt
-    // For now, return a placeholder value (100 seconds)
-    // In future: Hook to pit::ticks() or similar
-    Ok(100)
+    let seconds = crate::scheduler::get_elapsed_seconds() as usize;
+    Ok(seconds)
 }
 
 #[cfg(test)]
