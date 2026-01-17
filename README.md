@@ -141,13 +141,13 @@ graph TB
 ```mermaid
 stateDiagram-v2
     [*] --> Waiting: spawn N
-    Waiting: Task Ready in Queue
+    Waiting: Task Ready<br/>in Queue
     
     Waiting --> Running: run command
     Running: Execute Task<br/>Direct Rust Call
     
     Running --> Exited: Task completes
-    Exited: Status: Exited(code)
+    Exited: Exit Code<br/>Captured
     
     Exited --> [*]
     
