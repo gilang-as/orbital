@@ -7,6 +7,7 @@
 extern crate alloc;
 
 use orbital_kernel::println;
+use orbital_kernel::task::{Task, executor::Executor};
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
 
@@ -29,13 +30,12 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     #[cfg(test)]
     test_main();
 
-    // Create terminal process (kernel shell as a preemptive process)
-    // The terminal_main function runs as a regular kernel process
-    let _pid = orbital_kernel::process::create_process(orbital_kernel::task::terminal::terminal_main as usize);
+    // Disable timer interrupt preemption - let the async executor manage scheduling
+    orbital_kernel::scheduler::disable_preemption();
     
-    // Run the pure preemptive kernel scheduler
-    // This will schedule all kernel processes and handle timer-based preemption
-    orbital_kernel::scheduler::run_kernel_scheduler();
+    let mut executor = Executor::new();
+    executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
+    executor.run();
 }
 
 /// This function is called on panic.

@@ -11,10 +11,31 @@ use crate::process::ProcessStatus;
 use alloc::collections::VecDeque;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 /// Global elapsed time in timer ticks since kernel boot
 /// Timer frequency is approximately 100 Hz (10ms per tick)
 static ELAPSED_TICKS: spin::Mutex<u64> = spin::Mutex::new(0);
+
+/// Control whether timer interrupts perform context switching
+/// Set to false when running async executor (cooperative multitasking)
+/// Set to true for pure preemptive scheduling
+static PREEMPTION_ENABLED: AtomicBool = AtomicBool::new(true);
+
+/// Disable timer-based preemption (for cooperative multitasking environments like async executor)
+pub fn disable_preemption() {
+    PREEMPTION_ENABLED.store(false, Ordering::SeqCst);
+}
+
+/// Enable timer-based preemption
+pub fn enable_preemption() {
+    PREEMPTION_ENABLED.store(true, Ordering::SeqCst);
+}
+
+/// Check if preemption is currently enabled
+pub fn is_preemption_enabled() -> bool {
+    PREEMPTION_ENABLED.load(Ordering::SeqCst)
+}
 
 /// Scheduler state
 pub struct Scheduler {
@@ -161,25 +182,6 @@ pub fn check_quantum_expired() -> bool {
 pub fn get_elapsed_seconds() -> u64 {
     let ticks = ELAPSED_TICKS.lock();
     *ticks / 100  // 100 Hz timer = divide by 100 to get seconds
-}
-
-/// Run the kernel scheduler main loop
-/// This is the main loop for the pure kernel scheduler (no async executor)  
-/// It never returns - it runs forever handling scheduling
-pub fn run_kernel_scheduler() -> ! {
-    // Schedule the first process
-    let (_current, first_process) = schedule();
-    
-    match first_process {
-        Some(first_pid) => {
-            // Set up the initial process
-            unsafe { crate::context_switch::restore_context(&crate::process::get_process_context(first_pid).unwrap()) }
-        }
-        None => {
-            // No processes to run - just halt forever
-            crate::hlt_loop();
-        }
-    }
 }
 
 #[cfg(test)]

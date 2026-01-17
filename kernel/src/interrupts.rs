@@ -75,8 +75,9 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
     // Tick the scheduler to count time ticks
     let need_switch = crate::scheduler::timer_tick();
 
-    // If time quantum expired, perform context switch
-    if need_switch {
+    // Only perform context switch if preemption is enabled AND quantum expired
+    // When async executor is running, preemption is disabled (cooperative multitasking)
+    if crate::scheduler::is_preemption_enabled() && need_switch {
         // Get next process from scheduler
         let (current_pid, next_pid) = crate::scheduler::schedule();
 
