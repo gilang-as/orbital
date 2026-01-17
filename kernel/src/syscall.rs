@@ -282,15 +282,12 @@ fn sys_exit(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize,
             crate::process::ProcessStatus::Exited(exit_code),
         );
         
-        // Reschedule to next process
-        let (_current, next_pid) = crate::scheduler::schedule();
+        // Note: We don't perform context_switch here because sys_exit is called
+        // from task_wrapper_entry which is in task context, not interrupt handler context.
+        // Context switches must only happen from interrupt handlers with proper stack state.
+        // The next timer interrupt will see this task is Exited and schedule a different one.
         
-        // Switch to next process
-        if let Some(next) = next_pid {
-            crate::context_switch::context_switch(Some(current_pid), Some(next));
-        }
-        
-        // If no next process, halt
+        // Just halt - the next timer interrupt will handle scheduling
         crate::hlt_loop();
     }
 

@@ -20,6 +20,7 @@
 //!
 //! Context switching saves/restores the full CPU state (all registers).
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
@@ -116,8 +117,8 @@ pub struct Process {
     pub id: ProcessId,
     /// Entry point address (function pointer cast to usize)
     pub entry_point: usize,
-    /// Allocated stack for this task (4KB)
-    pub stack: Vec<u8>,
+    /// Allocated stack for this task (4KB) - using Box for stable address
+    pub stack: Box<[u8; TASK_STACK_SIZE]>,
     /// Saved CPU context (for context switching)
     pub saved_context: TaskContext,
     /// Current status
@@ -130,9 +131,9 @@ impl Process {
     /// Create a new process with the given entry point
     /// Allocates a stack and initializes CPU context
     pub fn new(entry_point: usize) -> Self {
-        // Allocate stack for this task
-        let mut stack = Vec::new();
-        stack.resize(TASK_STACK_SIZE, 0);
+        // Allocate stack for this task using Box for stable memory address
+        // Box ensures the stack doesn't move when Process is stored in Vec
+        let stack: Box<[u8; TASK_STACK_SIZE]> = Box::new([0u8; TASK_STACK_SIZE]);
         
         // Stack grows downward, so stack_top is at the end of allocated memory
         let stack_top = stack.as_ptr() as u64 + TASK_STACK_SIZE as u64;
