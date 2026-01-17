@@ -97,45 +97,98 @@ PID    Status
 
 ## Architecture
 
-Orbital OS uses a **direct task execution** model:
+Orbital OS uses a **direct task execution** model with three main subsystems:
 
-```
-                      ┌──────────────────┐
-                      │  User Types: cmd │
-                      └────────┬─────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │                     │
-              ┌─────▼─────┐      ┌────────▼────────┐
-              │ Shell      │      │ Async Executor  │
-              │ Commands   │      │ (Terminal)      │
-              └─────┬─────┘      └─────────────────┘
-                    │
-        ┌───────────┼───────────┐
-        │           │           │
-   ┌────▼──┐ ┌─────▼────┐ ┌───▼─────┐
-   │ spawn │ │ ps       │ │ run     │
-   │ (Add) │ │ (List)   │ │ (Exec)  │
-   └────┬──┘ └──────────┘ └───┬─────┘
-        │                      │
-        │              ┌───────▼────────┐
-        │              │ Execute Process│
-        │              │ Direct Call    │
-        │              └────────────────┘
-        │
-   ┌────▼──────────────────────────────┐
-   │ Process Table (Vec<Process>)       │
-   │ [PID:1, Status:Ready]              │
-   │ [PID:2, Status:Ready]              │
-   │ [PID:3, Status:Exited(0)]          │
-   └────────────────────────────────────┘
+### System Architecture
+
+```mermaid
+graph TB
+    User["👤 User Input"]
+    Executor["⚡ Async Executor"]
+    Shell["🐚 Shell"]
+    
+    Spawn["spawn<br/>Add Task"]
+    Ps["ps<br/>List Tasks"]
+    Run["run<br/>Execute"]
+    
+    Exec["Execute<br/>Direct Call"]
+    ProcTable["📋 Process Table<br/>Vec&lt;Process&gt;"]
+    
+    User --> Executor
+    User --> Shell
+    
+    Shell --> Spawn
+    Shell --> Ps
+    Shell --> Run
+    
+    Spawn --> ProcTable
+    Ps --> ProcTable
+    Run --> Exec
+    Exec --> ProcTable
+    
+    style User fill:#e1f5ff
+    style Executor fill:#fff3e0
+    style Shell fill:#f3e5f5
+    style ProcTable fill:#e8f5e9
+    style Spawn fill:#fce4ec
+    style Ps fill:#fce4ec
+    style Run fill:#fce4ec
+    style Exec fill:#fff9c4
 ```
 
-**Key Design Choice**: Use direct function calls instead of complex context switching
-- ✅ Safe (no inline assembly for context restoration)
-- ✅ Simple (easy to understand and debug)
-- ✅ Responsive (no CPU freezes)
-- ✅ Foundation (can evolve to preemptive later)
+### Command Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> Waiting: spawn N
+    Waiting: Task Ready in Queue
+    
+    Waiting --> Running: run command
+    Running: Execute Task<br/>Direct Rust Call
+    
+    Running --> Exited: Task completes
+    Exited: Status: Exited(code)
+    
+    Exited --> [*]
+    
+    note right of Waiting
+        Multiple tasks can
+        be in Ready state
+    end note
+    
+    note right of Running
+        Tasks execute
+        sequentially
+    end note
+```
+
+### Process Model
+
+```mermaid
+graph LR
+    A["Task Code"] -->|Rust Fn| B["Stack<br/>4 KB"]
+    B --> C["Process<br/>Struct"]
+    C --> D["Process Table"]
+    
+    style A fill:#e3f2fd
+    style B fill:#f3e5f5
+    style C fill:#e8f5e9
+    style D fill:#fff3e0
+```
+
+### Key Design Principles
+
+**Direct Execution Model**:
+- ✅ Safe: No inline assembly for context restoration
+- ✅ Simple: Rust function calls, easy to understand
+- ✅ Responsive: No CPU freezes
+- ✅ Foundation: Ready to evolve to preemptive in Phase 3
+
+**Why This Approach**:
+- Previous complex context switching caused double faults
+- Direct calls eliminate context restoration bugs
+- Sequential execution is simpler to debug
+- Perfect foundation for adding preemption later
 
 ## Documentation
 
