@@ -20,6 +20,7 @@
 //!
 //! Context switching saves/restores the full CPU state (all registers).
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
@@ -54,6 +55,8 @@ pub enum ProcessStatus {
 
 /// CPU context - all registers saved for a process
 /// Used during context switches to save/restore process state
+/// CRITICAL: #[repr(C)] ensures field order for inline asm offsets!
+#[repr(C)]
 #[derive(Debug, Clone)]
 pub struct TaskContext {
     /// General purpose registers
@@ -82,16 +85,18 @@ pub struct TaskContext {
 impl TaskContext {
     /// Create a new context for a task starting at entry_point
     /// Stack pointer is set to the top of the stack (grows downward)
-    pub fn new(entry_point: u64, stack_top: u64) -> Self {
+    pub fn new(entry_point: u64, _stack_top: u64) -> Self {
+        // For now, we don't actually use context switching
+        // Just store the entry point for reference
         TaskContext {
             rax: 0,
             rbx: 0,
             rcx: 0,
             rdx: 0,
             rsi: 0,
-            rdi: 0,
-            rbp: stack_top,      // Frame pointer at stack top
-            rsp: stack_top,      // Stack pointer at top (grows down)
+            rdi: entry_point,    // Task function pointer
+            rbp: 0,              // Not used
+            rsp: 0,              // Not used
             r8: 0,
             r9: 0,
             r10: 0,
@@ -100,8 +105,8 @@ impl TaskContext {
             r13: 0,
             r14: 0,
             r15: 0,
-            rip: entry_point,    // Start at entry point
-            rflags: 0x200,       // Interrupt flag enabled (0x200)
+            rip: 0,              // Not used
+            rflags: 0,           // Not used
         }
     }
 }
@@ -113,10 +118,10 @@ pub struct Process {
     pub id: ProcessId,
     /// Entry point address (function pointer cast to usize)
     pub entry_point: usize,
-    /// Allocated stack for this task (4KB)
-    pub stack: Vec<u8>,
+    /// Allocated stack for this task (4KB) - using Box for stable address
+    pub stack: Box<[u8; TASK_STACK_SIZE]>,
     /// Saved CPU context (for context switching)
-    pub context: TaskContext,
+    pub saved_context: TaskContext,
     /// Current status
     pub status: ProcessStatus,
     /// Return value (when exited)
@@ -127,21 +132,16 @@ impl Process {
     /// Create a new process with the given entry point
     /// Allocates a stack and initializes CPU context
     pub fn new(entry_point: usize) -> Self {
-        // Allocate stack for this task
-        let mut stack = Vec::new();
-        stack.resize(TASK_STACK_SIZE, 0);
-        
-        // Stack grows downward, so stack_top is at the end of allocated memory
-        let stack_top = stack.as_ptr() as u64 + TASK_STACK_SIZE as u64;
-        
-        // Initialize CPU context for task entry
-        let context = TaskContext::new(entry_point as u64, stack_top);
+        // For now, we don't allocate stacks - just store the task function
+        // Tasks will be executed directly by calling the function, not by context switching
+        let task_fn_ptr = entry_point as u64;
+        let saved_context = TaskContext::new(task_fn_ptr, 0);
         
         Process {
             id: ProcessId::new(),
             entry_point,
-            stack,
-            context,
+            stack: Box::new([0u8; TASK_STACK_SIZE]), // Still allocate but don't use yet
+            saved_context,
             status: ProcessStatus::Ready,
             exit_code: 0,
         }
@@ -178,10 +178,14 @@ pub fn create_process(entry_point: usize) -> i64 {
     }
 
     let process = Process::new(entry_point);
-    let pid = process.id.0 as i64;
+    let pid = process.id.0;
     processes.push(process);
 
-    pid
+    // Enqueue the process in the scheduler
+    drop(processes); // Release the lock before calling scheduler
+    crate::scheduler::enqueue_process(pid);
+
+    pid as i64
 }
 
 /// Get process by ID
@@ -255,13 +259,64 @@ pub fn list_processes() -> alloc::vec::Vec<(u64, ProcessStatus)> {
         .collect()
 }
 
+/// Execute a single task by PID directly (no context switching)
+pub fn execute_process(pid: u64) -> Option<i64> {
+    let entry_point = {
+        let table = get_or_init_process_table();
+        let mut processes = table.lock();
+        
+        if let Some(process) = processes.iter_mut().find(|p| p.id.0 == pid) {
+            process.status = ProcessStatus::Running;
+            process.entry_point
+        } else {
+            return None;
+        }
+    };
+    
+    // Execute the task function directly
+    let task_fn = unsafe { core::mem::transmute::<usize, fn() -> i64>(entry_point) };
+    let exit_code = task_fn();
+    
+    // Mark as exited
+    set_process_status(pid, ProcessStatus::Exited(exit_code));
+    
+    Some(exit_code)
+}
+
+/// Execute all ready processes
+pub fn execute_all_ready() -> u32 {
+    let mut executed = 0;
+    
+    loop {
+        // Find next ready process
+        let pid_to_run = {
+            let table = get_or_init_process_table();
+            let processes = table.lock();
+            
+            processes
+                .iter()
+                .find(|p| p.status == ProcessStatus::Ready)
+                .map(|p| p.id.0)
+        };
+        
+        if let Some(pid) = pid_to_run {
+            execute_process(pid);
+            executed += 1;
+        } else {
+            break;
+        }
+    }
+    
+    executed
+}
+
 /// Get mutable reference to process's context for saving/restoring
 pub fn get_process_context_mut(pid: u64) -> Option<*mut TaskContext> {
     let table = get_or_init_process_table();
     let mut processes = table.lock();
 
     if let Some(process) = processes.iter_mut().find(|p| p.id.0 == pid) {
-        Some(&mut process.context as *mut TaskContext)
+        Some(&mut process.saved_context as *mut TaskContext)
     } else {
         None
     }
@@ -275,7 +330,7 @@ pub fn get_process_stack_pointer(pid: u64) -> Option<u64> {
     processes
         .iter()
         .find(|p| p.id.0 == pid)
-        .map(|p| p.context.rsp)
+        .map(|p| p.saved_context.rsp)
 }
 
 /// Update process's stack pointer (RSP)
@@ -284,10 +339,41 @@ pub fn set_process_stack_pointer(pid: u64, rsp: u64) -> bool {
     let mut processes = table.lock();
 
     if let Some(process) = processes.iter_mut().find(|p| p.id.0 == pid) {
-        process.context.rsp = rsp;
+        process.saved_context.rsp = rsp;
         true
     } else {
         false
+    }
+}
+
+/// Get mutable access to a process (internal use)
+pub fn get_process_mut(pid: u64) -> Option<ProcessMutRef> {
+    // This is a helper that returns a reference to the process
+    // In practice, we use the table directly, but this helps with the API
+    let table = get_or_init_process_table();
+    let processes = table.lock();
+    
+    if processes.iter().any(|p| p.id.0 == pid) {
+        // Return a simple wrapper that indicates we can access the process
+        Some(ProcessMutRef { pid })
+    } else {
+        None
+    }
+}
+
+/// Helper struct for mutable process access
+pub struct ProcessMutRef {
+    pid: u64,
+}
+
+impl ProcessMutRef {
+    /// Update the saved context for this process
+    pub fn update_context(&self, ctx: TaskContext) {
+        let table = get_or_init_process_table();
+        let mut processes = table.lock();
+        if let Some(process) = processes.iter_mut().find(|p| p.id.0 == self.pid) {
+            process.saved_context = ctx;
+        }
     }
 }
 
@@ -314,6 +400,16 @@ pub unsafe fn context_switch(current_pid: Option<u64>, next_pid: u64) {
     }
 }
 
+/// Get a copy of a process's context
+pub fn get_process_context(pid: u64) -> Option<TaskContext> {
+    let table = get_or_init_process_table();
+    let processes = table.lock();
+    processes
+        .iter()
+        .find(|p| p.id.0 == pid)
+        .map(|p| p.saved_context.clone())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -335,5 +431,29 @@ mod tests {
     fn test_invalid_entry_point() {
         let pid = create_process(0); // NULL pointer
         assert_eq!(pid, -1);
+    }
+
+    #[test]
+    fn test_task_context_initialization() {
+        // Test that TaskContext is properly initialized for task entry
+        let stack_top = 0x8000u64;
+        let entry_point = 0x1000u64;
+        
+        let ctx = TaskContext::new(entry_point, stack_top);
+        
+        // Verify RIP points to entry point wrapper
+        assert!(ctx.rip > 0);
+        
+        // Verify RDI contains task function pointer
+        assert_eq!(ctx.rdi, entry_point);
+        
+        // Verify RBP at stack top
+        assert_eq!(ctx.rbp, stack_top);
+        
+        // Verify RSP is adjusted for stack frame
+        assert!(ctx.rsp < stack_top);
+        
+        // Verify interrupts are enabled (0x200 = IF flag)
+        assert_eq!(ctx.rflags, 0x200);
     }
 }

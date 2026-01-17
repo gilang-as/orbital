@@ -9,6 +9,7 @@ extern crate alloc;
 use core::panic::PanicInfo;
 
 pub mod allocator;
+pub mod context_switch;
 pub mod gdt;
 pub mod input;
 pub mod interrupts;
@@ -20,6 +21,8 @@ pub mod serial;
 pub mod shell;
 pub mod syscall;
 pub mod task;
+pub mod task_entry;
+pub mod tasks;
 pub mod tty;
 pub mod vga_buffer;
 

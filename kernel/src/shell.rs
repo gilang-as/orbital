@@ -28,16 +28,28 @@ impl Shell {
                 println!("pong");
             }
             Some("spawn") => {
-                // Demo: spawn a task with a dummy entry point
-                // In real usage, this would be replaced with orbital-cli or other userspace process
-                let pid = crate::process::create_process(0x1000);
-                if pid > 0 {
-                    println!("Spawned process with PID: {}", pid);
-                    let status = crate::process::get_process_status(pid as u64);
-                    println!("Process status: {:?}", status);
+                // Spawn a test task by index: spawn 1, spawn 2, etc.
+                // Default to task 1 if no argument given
+                let task_index = parts.get(1)
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or(1);
+                
+                if let Some(task_fn) = crate::tasks::get_test_task(task_index) {
+                    let pid = crate::process::create_process(task_fn as usize);
+                    if pid > 0 {
+                        println!("Spawned task {} with PID: {}", task_index, pid);
+                    } else {
+                        println!("Failed to spawn task {}: error {}", task_index, pid);
+                    }
                 } else {
-                    println!("Failed to spawn process: error {}", pid);
+                    println!("Unknown task index: {}. Try: spawn 1, spawn 2, spawn 3, spawn 4", task_index);
                 }
+            }
+            Some("run") => {
+                // Execute all ready processes
+                println!("Executing all ready processes...");
+                let count = crate::process::execute_all_ready();
+                println!("Executed {} processes", count);
             }
             Some("ps") => {
                 // List all processes
@@ -52,6 +64,7 @@ impl Shell {
                 println!("  echo <message>  - Print a message");
                 println!("  ping            - Respond with pong");
                 println!("  spawn           - Create a new task");
+                println!("  run             - Execute all ready tasks");
                 println!("  ps              - List all processes");
                 println!("  help            - Show this help message");
                 println!("  clear           - Clear the screen");

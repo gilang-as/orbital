@@ -72,6 +72,21 @@ extern "x86-interrupt" fn double_fault_handler(
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    // Tick the scheduler to count time ticks
+    let need_switch = crate::scheduler::timer_tick();
+
+    // Only perform context switch if preemption is enabled AND quantum expired
+    // When async executor is running, preemption is disabled (cooperative multitasking)
+    if crate::scheduler::is_preemption_enabled() && need_switch {
+        // Get next process from scheduler
+        let (current_pid, next_pid) = crate::scheduler::schedule();
+
+        // Perform context switch if there's a next process
+        if let Some(next) = next_pid {
+            crate::context_switch::context_switch(current_pid, Some(next));
+        }
+    }
+
     unsafe {
         PICS.lock()
             .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
@@ -83,6 +98,11 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
 
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
+    
+    // Add to input buffer for terminal to read
+    crate::input::add_scancode(scancode);
+    
+    // Also add to async task keyboard stream for backward compatibility
     crate::task::keyboard::add_scancode(scancode);
 
     unsafe {
