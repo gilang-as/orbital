@@ -6,7 +6,7 @@
 //! Task Memory Layout:
 //! Each task gets a 4KB stack allocated from the kernel heap.
 //! Stack grows downward (high to low address).
-//! 
+//!
 //! Stack Layout (grows downward):
 //! ┌─────────────────┐ 0x7FFF
 //! │   top (unused)  │
@@ -94,9 +94,9 @@ impl TaskContext {
             rcx: 0,
             rdx: 0,
             rsi: 0,
-            rdi: entry_point,    // Task function pointer
-            rbp: 0,              // Not used
-            rsp: 0,              // Not used
+            rdi: entry_point, // Task function pointer
+            rbp: 0,           // Not used
+            rsp: 0,           // Not used
             r8: 0,
             r9: 0,
             r10: 0,
@@ -105,8 +105,8 @@ impl TaskContext {
             r13: 0,
             r14: 0,
             r15: 0,
-            rip: 0,              // Not used
-            rflags: 0,           // Not used
+            rip: 0,    // Not used
+            rflags: 0, // Not used
         }
     }
 }
@@ -136,7 +136,7 @@ impl Process {
         // Tasks will be executed directly by calling the function, not by context switching
         let task_fn_ptr = entry_point as u64;
         let saved_context = TaskContext::new(task_fn_ptr, 0);
-        
+
         Process {
             id: ProcessId::new(),
             entry_point,
@@ -193,10 +193,7 @@ pub fn get_process(pid: u64) -> Option<ProcessId> {
     let table = get_or_init_process_table();
     let processes = table.lock();
 
-    processes
-        .iter()
-        .find(|p| p.id.0 == pid)
-        .map(|p| p.id)
+    processes.iter().find(|p| p.id.0 == pid).map(|p| p.id)
 }
 
 /// Get the status of a process
@@ -204,10 +201,7 @@ pub fn get_process_status(pid: u64) -> Option<ProcessStatus> {
     let table = get_or_init_process_table();
     let processes = table.lock();
 
-    processes
-        .iter()
-        .find(|p| p.id.0 == pid)
-        .map(|p| p.status)
+    processes.iter().find(|p| p.id.0 == pid).map(|p| p.status)
 }
 
 /// Update process status
@@ -253,10 +247,7 @@ pub fn list_processes() -> alloc::vec::Vec<(u64, ProcessStatus)> {
     let table = get_or_init_process_table();
     let processes = table.lock();
 
-    processes
-        .iter()
-        .map(|p| (p.id.0, p.status))
-        .collect()
+    processes.iter().map(|p| (p.id.0, p.status)).collect()
 }
 
 /// Execute a single task by PID directly (no context switching)
@@ -264,7 +255,7 @@ pub fn execute_process(pid: u64) -> Option<i64> {
     let entry_point = {
         let table = get_or_init_process_table();
         let mut processes = table.lock();
-        
+
         if let Some(process) = processes.iter_mut().find(|p| p.id.0 == pid) {
             process.status = ProcessStatus::Running;
             process.entry_point
@@ -272,33 +263,33 @@ pub fn execute_process(pid: u64) -> Option<i64> {
             return None;
         }
     };
-    
+
     // Execute the task function directly
     let task_fn = unsafe { core::mem::transmute::<usize, fn() -> i64>(entry_point) };
     let exit_code = task_fn();
-    
+
     // Mark as exited
     set_process_status(pid, ProcessStatus::Exited(exit_code));
-    
+
     Some(exit_code)
 }
 
 /// Execute all ready processes
 pub fn execute_all_ready() -> u32 {
     let mut executed = 0;
-    
+
     loop {
         // Find next ready process
         let pid_to_run = {
             let table = get_or_init_process_table();
             let processes = table.lock();
-            
+
             processes
                 .iter()
                 .find(|p| p.status == ProcessStatus::Ready)
                 .map(|p| p.id.0)
         };
-        
+
         if let Some(pid) = pid_to_run {
             execute_process(pid);
             executed += 1;
@@ -306,7 +297,7 @@ pub fn execute_all_ready() -> u32 {
             break;
         }
     }
-    
+
     executed
 }
 
@@ -352,7 +343,7 @@ pub fn get_process_mut(pid: u64) -> Option<ProcessMutRef> {
     // In practice, we use the table directly, but this helps with the API
     let table = get_or_init_process_table();
     let processes = table.lock();
-    
+
     if processes.iter().any(|p| p.id.0 == pid) {
         // Return a simple wrapper that indicates we can access the process
         Some(ProcessMutRef { pid })
@@ -438,21 +429,21 @@ mod tests {
         // Test that TaskContext is properly initialized for task entry
         let stack_top = 0x8000u64;
         let entry_point = 0x1000u64;
-        
+
         let ctx = TaskContext::new(entry_point, stack_top);
-        
+
         // Verify RIP points to entry point wrapper
         assert!(ctx.rip > 0);
-        
+
         // Verify RDI contains task function pointer
         assert_eq!(ctx.rdi, entry_point);
-        
+
         // Verify RBP at stack top
         assert_eq!(ctx.rbp, stack_top);
-        
+
         // Verify RSP is adjusted for stack frame
         assert!(ctx.rsp < stack_top);
-        
+
         // Verify interrupts are enabled (0x200 = IF flag)
         assert_eq!(ctx.rflags, 0x200);
     }

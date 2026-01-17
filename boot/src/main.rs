@@ -6,10 +6,10 @@
 
 extern crate alloc;
 
-use orbital_kernel::println;
-use orbital_kernel::task::{Task, executor::Executor};
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
+use orbital_kernel::println;
+use orbital_kernel::task::{Task, executor::Executor};
 
 entry_point!(boot_main);
 

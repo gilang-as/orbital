@@ -6,10 +6,10 @@
 
 extern crate alloc;
 
-use orbital_kernel::println;
-use orbital_kernel::task::{Task, executor::Executor};
 use bootloader::{BootInfo, entry_point};
 use core::panic::PanicInfo;
+use orbital_kernel::println;
+use orbital_kernel::task::{Task, executor::Executor};
 
 entry_point!(kernel_main);
 
@@ -32,7 +32,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     // Disable timer interrupt preemption - let the async executor manage scheduling
     orbital_kernel::scheduler::disable_preemption();
-    
+
     let mut executor = Executor::new();
     executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
     executor.run();

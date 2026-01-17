@@ -5,9 +5,9 @@
 #![test_runner(orbital_kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use orbital_kernel::{QemuExitCode, exit_qemu, serial_print, serial_println};
 use core::panic::PanicInfo;
 use lazy_static::lazy_static;
+use orbital_kernel::{QemuExitCode, exit_qemu, serial_print, serial_println};
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame};
 
 #[unsafe(no_mangle)]

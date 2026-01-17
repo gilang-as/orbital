@@ -98,10 +98,10 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
 
     let mut port = Port::new(0x60);
     let scancode: u8 = unsafe { port.read() };
-    
+
     // Add to input buffer for terminal to read
     crate::input::add_scancode(scancode);
-    
+
     // Also add to async task keyboard stream for backward compatibility
     crate::task::keyboard::add_scancode(scancode);
 
@@ -142,4 +142,3 @@ fn test_breakpoint_exception() {
 //
 // TODO: Implement syscall_entry assembly and call init_syscall_msr() during boot
 // For now, syscall is not yet wired up. Full implementation in phase 2.
-

@@ -80,17 +80,17 @@ type SyscallHandler = fn(usize, usize, usize, usize, usize, usize) -> SysResult;
 /// Syscall dispatch table
 /// Maps syscall numbers to handler functions
 const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
-    Some(sys_hello),           // 0
-    Some(sys_log),             // 1
-    Some(sys_write),           // 2
-    Some(sys_exit),            // 3
-    Some(sys_read),            // 4
-    Some(sys_task_create),     // 5
-    Some(sys_task_wait),       // 6
-    Some(sys_get_pid),         // 7
-    Some(sys_ps),              // 8
-    Some(sys_uptime),          // 9
-    // More syscalls go here
+    Some(sys_hello),       // 0
+    Some(sys_log),         // 1
+    Some(sys_write),       // 2
+    Some(sys_exit),        // 3
+    Some(sys_read),        // 4
+    Some(sys_task_create), // 5
+    Some(sys_task_wait),   // 6
+    Some(sys_get_pid),     // 7
+    Some(sys_ps),          // 8
+    Some(sys_uptime),      // 9
+                           // More syscalls go here
 ];
 
 /// Syscall number constants
@@ -135,7 +135,14 @@ pub fn dispatch_syscall(
 
 /// sys_hello - Test syscall
 /// Returns a constant value (0xDEADBEEF as success indicator)
-fn sys_hello(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_hello(
+    arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     // Use arg1 to demonstrate argument passing
     // arg1 is typically the "magic number" for verification
     if arg1 == 0xCAFEBABE {
@@ -166,7 +173,14 @@ fn sys_hello(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize
 /// - Uses core::ptr::copy_nonoverlapping for safe memory copy
 /// - Does NOT interpret message content (bytes are opaque to kernel)
 /// - Disables interrupts during output to prevent context switches
-fn sys_log(arg1: usize, arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_log(
+    arg1: usize,
+    arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let ptr = arg1 as *const u8;
     let len = arg2;
 
@@ -227,7 +241,14 @@ fn sys_log(arg1: usize, arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _
 /// - Validates buffer length (same as sys_log: 1-4096)
 /// - Validates pointer is not NULL
 /// - Uses safe memory copy
-fn sys_write(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_write(
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let fd = arg1;
     let ptr = arg2 as *const u8;
     let len = arg3;
@@ -271,7 +292,14 @@ fn sys_write(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, 
 /// Arguments:
 ///   arg1: exit code
 /// Returns: never (or error if already exiting)
-fn sys_exit(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_exit(
+    arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let exit_code = arg1 as i64;
 
     // Get current process ID from scheduler
@@ -281,12 +309,12 @@ fn sys_exit(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize,
             current_pid,
             crate::process::ProcessStatus::Exited(exit_code),
         );
-        
+
         // Note: We don't perform context_switch here because sys_exit is called
         // from task_wrapper_entry which is in task context, not interrupt handler context.
         // Context switches must only happen from interrupt handlers with proper stack state.
         // The next timer interrupt will see this task is Exited and schedule a different one.
-        
+
         // Just halt - the next timer interrupt will handle scheduling
         crate::hlt_loop();
     }
@@ -316,7 +344,14 @@ fn sys_exit(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize,
 /// - Validates buffer length (1-4096)
 /// - Validates pointer is not NULL
 /// - Uses safe memory copy from kernel buffer to userspace
-fn sys_read(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_read(
+    arg1: usize,
+    arg2: usize,
+    arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let fd = arg1;
     let ptr = arg2 as *mut u8;
     let len = arg3;
@@ -370,7 +405,14 @@ fn sys_read(arg1: usize, arg2: usize, arg3: usize, _arg4: usize, _arg5: usize, _
 /// 1. Create process with entry point (allocates stack)
 /// 2. Add to scheduler ready queue
 /// 3. Return process ID
-fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_task_create(
+    arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let entry_point = arg1;
 
     // Validate entry point is not NULL
@@ -384,17 +426,17 @@ fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5:
     if pid < 0 {
         // Negative return value indicates error
         match pid {
-            -1 => Err(SysError::Invalid),  // Invalid address
-            -2 => Err(SysError::Error),    // Too many processes
-            _ => Err(SysError::Error),     // Other error
+            -1 => Err(SysError::Invalid), // Invalid address
+            -2 => Err(SysError::Error),   // Too many processes
+            _ => Err(SysError::Error),    // Other error
         }
     } else {
         // Add the new process to the scheduler's ready queue
         crate::scheduler::enqueue_process(pid as u64);
-        
+
         // Update status to Ready
         crate::process::set_process_status(pid as u64, crate::process::ProcessStatus::Ready);
-        
+
         // Return the process ID as success
         Ok(pid as usize)
     }
@@ -403,7 +445,7 @@ fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5:
 /// sys_task_wait - Wait for a task to complete
 ///
 /// Blocks until the specified task exits, returning its exit code.
-/// 
+///
 /// # Arguments
 /// - arg1: Process ID to wait for
 /// - Others: Reserved
@@ -412,7 +454,14 @@ fn sys_task_create(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5:
 /// - Ok(exit_code): Task's exit code when it completes
 /// - Err(SysError::NotFound): Task doesn't exist
 /// - Err(SysError::Invalid): Invalid task ID
-fn sys_task_wait(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_task_wait(
+    arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let pid = arg1 as u64;
 
     // Validate PID is not zero
@@ -437,7 +486,14 @@ fn sys_task_wait(arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: u
 ///
 /// # Returns
 /// - Ok(pid): Current process ID (always > 0)
-fn sys_get_pid(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_get_pid(
+    _arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     // In a real implementation, we'd get the current process from the scheduler
     // For now, return a placeholder (in future: retrieve from scheduler::current_process())
     // Using 1 as placeholder since task IDs start at 1
@@ -458,7 +514,14 @@ fn sys_get_pid(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: us
 /// - Ok(bytes_written): Number of bytes written to buffer
 /// - Err(SysError::Fault): Invalid pointer
 /// - Err(SysError::Invalid): Buffer too small
-fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_ps(
+    buf_ptr: usize,
+    buf_len: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     // Validate buffer is not NULL
     if buf_ptr == 0 || buf_len == 0 {
         return Err(SysError::Invalid);
@@ -466,7 +529,7 @@ fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usi
 
     // Get list of processes
     let processes = crate::process::list_processes();
-    
+
     // Build a simple string representation (simplified - in real kernel, would be binary format)
     let mut output = alloc::string::String::new();
     output.push_str("PID Status\n");
@@ -479,13 +542,13 @@ fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usi
         };
         output.push_str(&format!("{:3} {}\n", pid, status_str));
     }
-    
+
     // Copy to userspace buffer
     let output_bytes = output.as_bytes();
     if output_bytes.len() > buf_len {
         return Err(SysError::Invalid); // Buffer too small
     }
-    
+
     // In a real implementation, would validate buf_ptr is accessible from userspace
     // For now, assume it's valid
     unsafe {
@@ -495,7 +558,7 @@ fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usi
             output_bytes.len(),
         );
     }
-    
+
     Ok(output_bytes.len())
 }
 
@@ -509,7 +572,14 @@ fn sys_ps(buf_ptr: usize, buf_len: usize, _arg3: usize, _arg4: usize, _arg5: usi
 ///
 /// # Returns
 /// - Ok(seconds): Number of seconds since boot
-fn sys_uptime(_arg1: usize, _arg2: usize, _arg3: usize, _arg4: usize, _arg5: usize, _arg6: usize) -> SysResult {
+fn sys_uptime(
+    _arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
     let seconds = crate::scheduler::get_elapsed_seconds() as usize;
     Ok(seconds)
 }

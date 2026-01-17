@@ -4,8 +4,8 @@
 #![test_runner(orbital_kernel::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
-use orbital_kernel::println;
 use core::panic::PanicInfo;
+use orbital_kernel::println;
 
 #[unsafe(no_mangle)] // don't mangle the name of this function
 pub extern "C" fn _start() -> ! {

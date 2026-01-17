@@ -10,8 +10,8 @@
 use crate::process::ProcessStatus;
 use alloc::collections::VecDeque;
 use conquer_once::spin::OnceCell;
-use spin::Mutex;
 use core::sync::atomic::{AtomicBool, Ordering};
+use spin::Mutex;
 
 /// Global elapsed time in timer ticks since kernel boot
 /// Timer frequency is approximately 100 Hz (10ms per tick)
@@ -155,7 +155,7 @@ pub fn current_process() -> Option<u64> {
 pub fn timer_tick() -> bool {
     // Increment global elapsed time
     Scheduler::increment_elapsed_time();
-    
+
     let scheduler = get_or_init_scheduler();
     let mut sched = scheduler.lock();
     sched.tick()
@@ -181,7 +181,7 @@ pub fn check_quantum_expired() -> bool {
 /// Get elapsed time in seconds since kernel boot
 pub fn get_elapsed_seconds() -> u64 {
     let ticks = ELAPSED_TICKS.lock();
-    *ticks / 100  // 100 Hz timer = divide by 100 to get seconds
+    *ticks / 100 // 100 Hz timer = divide by 100 to get seconds
 }
 
 #[cfg(test)]

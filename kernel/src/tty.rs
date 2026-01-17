@@ -21,8 +21,8 @@
 //! - Locks serial port mutex during access
 //! - No panics on invalid input (caller is responsible for validation)
 
-use x86_64::instructions::interrupts;
 use core::fmt::Write;
+use x86_64::instructions::interrupts;
 
 /// Maximum bytes per TTY write operation
 /// Matches sys_write validation limit
@@ -46,7 +46,11 @@ const TTY_MAX_WRITE: usize = 4096;
 /// Panics if buffer length exceeds TTY_MAX_WRITE
 pub fn tty_write(buf: &[u8]) -> usize {
     if buf.len() > TTY_MAX_WRITE {
-        panic!("TTY write exceeds maximum size: {} > {}", buf.len(), TTY_MAX_WRITE);
+        panic!(
+            "TTY write exceeds maximum size: {} > {}",
+            buf.len(),
+            TTY_MAX_WRITE
+        );
     }
 
     if buf.is_empty() {

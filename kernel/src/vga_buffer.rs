@@ -85,12 +85,13 @@ impl Writer {
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
-            0x08 => { // Backspace (ASCII code 8): move cursor back and clear
+            0x08 => {
+                // Backspace (ASCII code 8): move cursor back and clear
                 if self.column_position > 0 {
                     self.column_position -= 1;
                     let row = BUFFER_HEIGHT - 1;
                     let col = self.column_position;
-                    
+
                     // Write blank character at current position
                     let blank = ScreenChar {
                         ascii_character: b' ',
@@ -120,7 +121,7 @@ impl Writer {
     /// Writes the given ASCII string to the buffer.
     ///
     /// Wraps lines at `BUFFER_WIDTH`. Supports the `\n` newline character and backspace.
-    /// Does **not** support strings with non-ASCII characters, since they can't be printed 
+    /// Does **not** support strings with non-ASCII characters, since they can't be printed
     /// in the VGA text mode.
     fn write_string(&mut self, s: &str) {
         for byte in s.bytes() {
@@ -214,7 +215,6 @@ impl Writer {
         }
     }
 }
-
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {

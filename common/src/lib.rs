@@ -8,7 +8,7 @@
 /// IPC message types
 pub mod ipc {
     /// Raw IPC message transmitted over ring buffer
-    /// 
+    ///
     /// This is a minimal byte-oriented message type. Userspace is responsible
     /// for interpreting the payload - kernel only moves bytes.
     #[derive(Debug, Clone, Copy)]

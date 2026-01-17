@@ -1,5 +1,5 @@
-use alloc::vec::Vec;
 use crate::println;
+use alloc::vec::Vec;
 
 pub struct Shell;
 
@@ -10,13 +10,13 @@ impl Shell {
 
     pub fn execute(&mut self, command: &str) {
         let trimmed = command.trim();
-        
+
         if trimmed.is_empty() {
             return;
         }
 
         let parts: Vec<&str> = trimmed.split_whitespace().collect();
-        
+
         match parts.get(0).copied() {
             Some("echo") => {
                 if parts.len() > 1 {
@@ -30,10 +30,11 @@ impl Shell {
             Some("spawn") => {
                 // Spawn a test task by index: spawn 1, spawn 2, etc.
                 // Default to task 1 if no argument given
-                let task_index = parts.get(1)
+                let task_index = parts
+                    .get(1)
                     .and_then(|s| s.parse::<usize>().ok())
                     .unwrap_or(1);
-                
+
                 if let Some(task_fn) = crate::tasks::get_test_task(task_index) {
                     let pid = crate::process::create_process(task_fn as usize);
                     if pid > 0 {
@@ -42,7 +43,10 @@ impl Shell {
                         println!("Failed to spawn task {}: error {}", task_index, pid);
                     }
                 } else {
-                    println!("Unknown task index: {}. Try: spawn 1, spawn 2, spawn 3, spawn 4", task_index);
+                    println!(
+                        "Unknown task index: {}. Try: spawn 1, spawn 2, spawn 3, spawn 4",
+                        task_index
+                    );
                 }
             }
             Some("run") => {

@@ -15,7 +15,7 @@ use crate::syscall;
 pub type TaskFn = fn() -> i64;
 
 /// Initialize a task's stack with proper frame
-/// 
+///
 /// Sets up the stack so that the task can be properly initialized.
 ///
 /// # Arguments
@@ -50,7 +50,7 @@ pub fn get_task_entry_point() -> u64 {
 #[inline(never)]
 pub fn task_wrapper_entry() {
     let exit_code: i64;
-    
+
     unsafe {
         // Call the function pointer that's in RDI
         // The function returns an i64 (exit code) in RAX
@@ -59,23 +59,14 @@ pub fn task_wrapper_entry() {
             out("rax") exit_code,
         );
     }
-    
+
     // Task function has returned, now call sys_exit with the exit code
     // This will terminate the task and schedule the next process
-    let _ = syscall::dispatch_syscall(
-        syscall::nr::SYS_EXIT,
-        exit_code as usize,
-        0,
-        0,
-        0,
-        0,
-        0,
-    );
-    
+    let _ = syscall::dispatch_syscall(syscall::nr::SYS_EXIT, exit_code as usize, 0, 0, 0, 0, 0);
+
     // dispatch_syscall should never return for sys_exit,
     // but if it does, we halt the CPU
     unsafe {
         core::arch::asm!("hlt", options(noreturn));
     }
 }
-

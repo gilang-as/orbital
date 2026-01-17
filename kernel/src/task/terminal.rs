@@ -1,7 +1,7 @@
-use crate::{print, println};
 use crate::shell::Shell;
-use alloc::string::String;
 use crate::task::keyboard::ScancodeStream;
+use crate::{print, println};
+use alloc::string::String;
 use futures_util::stream::StreamExt;
 use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
 
@@ -12,10 +12,10 @@ pub async fn terminal() {
         layouts::Us104Key,
         HandleControl::Ignore,
     );
-    
+
     let mut shell = Shell::new();
     let mut input_line = String::new();
-    
+
     print!("> ");
     update_cursor();
 
@@ -34,7 +34,8 @@ pub async fn terminal() {
                                 print!("> ");
                                 update_cursor();
                             }
-                            '\u{0008}' => { // Backspace
+                            '\u{0008}' => {
+                                // Backspace
                                 if !input_line.is_empty() {
                                     input_line.pop();
                                     // Print actual backspace character - VGA buffer will handle it
@@ -46,7 +47,7 @@ pub async fn terminal() {
                                 input_line.push(character);
                                 print!("{}", character);
                                 update_cursor();
-                                
+
                                 // Queue character for userspace to read via sys_read
                                 crate::input::add_input_char(character as u8);
                             }
