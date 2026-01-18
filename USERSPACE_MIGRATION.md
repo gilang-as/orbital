@@ -2,7 +2,7 @@
 
 **Phase**: Between Phase 2 and Phase 3  
 **Goal**: Move all policy (shell, TTY, process control) from kernel to userspace  
-**Status**: ⏳ PLANNING
+**Status**: 🚀 IN PROGRESS (Critical blockers resolved)
 
 ---
 
@@ -20,13 +20,13 @@ These must be implemented in the kernel BEFORE moving shell to userspace.
 
 ### 1.1 Display Control Syscalls
 
-- [ ] **sys_clear_screen** - Clear VGA display
+- [x] **sys_clear_screen** - Clear VGA display ✅ IMPLEMENTED
   - **Blocker for**: `clear` command
   - **Location**: `kernel/src/syscall.rs`
   - **Implementation**: Call existing `vga_buffer::clear_screen()`
   - **Arguments**: None
   - **Returns**: 0 on success
-  - **Notes**: Currently only callable from kernel; need userspace syscall
+  - **Userspace wrapper**: `syscall_clear_screen()` in orbital_ipc
 
 - [ ] **sys_cursor_position** - Get/set cursor position (optional, Phase 3+)
   - **Blocker for**: Advanced TTY features
@@ -38,13 +38,13 @@ These must be implemented in the kernel BEFORE moving shell to userspace.
 
 ### 1.2 Process Scheduling Syscalls
 
-- [ ] **sys_run_ready** - Execute all ready processes
+- [x] **sys_run_ready** - Execute all ready processes ✅ IMPLEMENTED
   - **Blocker for**: `run` command, batch task execution
   - **Location**: `kernel/src/syscall.rs`
   - **Implementation**: Call `process::execute_all_ready()`
   - **Arguments**: None
   - **Returns**: Number of processes executed
-  - **Notes**: Critical for userspace control of task execution
+  - **Userspace wrapper**: `syscall_run_ready()` in orbital_ipc
 
 - [ ] **sys_get_process_state** - Query individual process state
   - **Blocker for**: Enhanced `ps` command
@@ -73,21 +73,21 @@ All 7 shell commands from kernel `shell.rs` to userspace `cli/src/main.rs`
 - [x] `spawn` - ✅ Complete (but different semantics)
 
 ### 2.2 Need to Add to Userspace CLI
-- [ ] `ping` command
+- [x] `ping` command ✅ IMPLEMENTED
   - **Kernel version**: Simple "pong" response
   - **Implementation**: Echo "pong" to stdout
   - **Syscalls needed**: None (just prints)
 
-- [ ] `run` command - Execute all ready processes
+- [x] `run` command - Execute all ready processes ✅ IMPLEMENTED
   - **Kernel version**: Calls `process::execute_all_ready()`
   - **Implementation**: Call new `sys_run_ready()` syscall
-  - **Syscalls needed**: `sys_run_ready` (see 1.2)
-  - **Notes**: Userspace should decide when to run tasks
+  - **Syscalls needed**: `sys_run_ready` ✅
+  - **Notes**: Userspace now owns when tasks execute
 
-- [ ] `clear` command - Clear screen
+- [x] `clear` command - Clear screen ✅ IMPLEMENTED
   - **Kernel version**: Calls `vga_buffer::clear_screen()`
   - **Implementation**: Call new `sys_clear_screen()` syscall
-  - **Syscalls needed**: `sys_clear_screen` (see 1.1)
+  - **Syscalls needed**: `sys_clear_screen` ✅
 
 ### 2.3 Enhance Existing Commands
 - [ ] `spawn` - Reconcile with kernel semantics
@@ -283,12 +283,12 @@ Each change must be verified.
 Must resolve these before Phase 3.
 
 ### Critical Blockers (MUST FIX)
-- [ ] **Blocker #1**: Add `sys_clear_screen` syscall
+- [x] **Blocker #1**: Add `sys_clear_screen` syscall ✅ DONE
   - **Impact**: `clear` command, terminal management
   - **Resolution**: 30 mins - expose existing vga_buffer function
   - **Dependency**: None
 
-- [ ] **Blocker #2**: Add `sys_run_ready` syscall
+- [x] **Blocker #2**: Add `sys_run_ready` syscall ✅ DONE
   - **Impact**: `run` command, batch task execution
   - **Resolution**: 30 mins - expose existing process function
   - **Dependency**: None
@@ -296,7 +296,7 @@ Must resolve these before Phase 3.
 - [ ] **Blocker #3**: Ensure userspace CLI compiles and runs
   - **Impact**: All policy operations
   - **Resolution**: 1-2 hours - add commands, test syscalls
-  - **Dependency**: Blockers #1 & #2
+  - **Dependency**: Blockers #1 & #2 ✅
 
 ### Medium Blockers (SHOULD FIX)
 - [ ] **Blocker #4**: Boot sequence launches userspace CLI
@@ -317,10 +317,10 @@ Must resolve these before Phase 3.
 Do in this sequence to minimize risk.
 
 ```
-1. Add sys_clear_screen syscall
-2. Add sys_run_ready syscall
-3. Add missing CLI commands (ping, clear, run)
-4. Test all CLI commands work
+✅ 1. Add sys_clear_screen syscall - DONE
+✅ 2. Add sys_run_ready syscall - DONE
+✅ 3. Add missing CLI commands (ping, clear, run) - DONE
+⏳ 4. Test all CLI commands work - IN PROGRESS
 5. Update boot sequence (optional, can defer)
 6. Remove kernel shell.rs (optional, can defer)
 7. Comprehensive integration testing
@@ -384,4 +384,5 @@ Phase 3 can focus on:
 | Date | Version | Status |
 |------|---------|--------|
 | 2026-01-17 | 1.0 | Initial checklist |
+| 2026-01-18 | 1.1 | Critical blockers resolved - syscalls implemented and CLI commands added |
 
