@@ -17,12 +17,8 @@
 //! This shows the "policy-free kernel" principle:
 //! Kernel provides I/O syscalls, userspace provides command logic.
 
-use orbital_ipc::{syscall_task_create, syscall_task_wait, syscall_write, 
-                   syscall_get_pid, syscall_ps, syscall_uptime, 
-                   syscall_clear_screen, syscall_run_ready};
-
 // ============================================================================
-// Syscall Wrappers
+// Syscall Wrappers (inlined to avoid std/no_std conflicts)
 // ============================================================================
 
 /// Invoke sys_read syscall (fd=0 is stdin)
@@ -89,6 +85,209 @@ fn syscall_write(fd: i32, ptr: *const u8, len: usize) -> Result<usize, i64> {
     {
         let _ = (fd, ptr, len);
         Ok(0)
+    }
+}
+
+/// Invoke sys_task_create syscall
+/// Creates a new task (spawns a process)
+#[inline]
+fn syscall_task_create(entry_addr: usize) -> Result<u64, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 5i64 => result,  // syscall #5 = SYS_TASK_CREATE
+                in("rdi") entry_addr,
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as u64)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let _ = entry_addr;
+        Err(-2)
+    }
+}
+
+/// Invoke sys_task_wait syscall
+/// Waits for a task to complete and returns its exit code
+#[inline]
+fn syscall_task_wait(pid: u64) -> Result<i32, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 6i64 => result,  // syscall #6 = SYS_TASK_WAIT
+                in("rdi") pid,
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as i32)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let _ = pid;
+        Err(-2)
+    }
+}
+
+/// Invoke sys_get_pid syscall
+/// Returns the current process ID
+#[inline]
+fn syscall_get_pid() -> Result<u64, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 7i64 => result,  // syscall #7 = SYS_GET_PID
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as u64)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(-2)
+    }
+}
+
+/// Invoke sys_ps syscall
+/// Lists running processes
+#[inline]
+fn syscall_ps(buf: &mut [u8]) -> Result<usize, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 8i64 => result,  // syscall #8 = SYS_PS
+                in("rdi") buf.as_mut_ptr(),
+                in("rsi") buf.len(),
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as usize)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        let _ = buf;
+        Err(-2)
+    }
+}
+
+/// Invoke sys_uptime syscall
+/// Returns kernel uptime in milliseconds
+#[inline]
+fn syscall_uptime() -> Result<u64, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 9i64 => result,  // syscall #9 = SYS_UPTIME
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as u64)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(-2)
+    }
+}
+
+/// Invoke sys_clear_screen syscall
+/// Clears the VGA display
+#[inline]
+fn syscall_clear_screen() -> Result<usize, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 10i64 => result,  // syscall #10 = SYS_CLEAR_SCREEN
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as usize)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(-2)
+    }
+}
+
+/// Invoke sys_run_ready syscall
+/// Executes all ready processes
+#[inline]
+fn syscall_run_ready() -> Result<usize, i64> {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let result: i64;
+        unsafe {
+            std::arch::asm!(
+                "syscall",
+                inout("rax") 11i64 => result,  // syscall #11 = SYS_RUN_READY
+                clobber_abi("C"),
+            );
+        }
+        
+        if result < 0 {
+            Err(result)
+        } else {
+            Ok(result as usize)
+        }
+    }
+    
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(-2)
     }
 }
 
@@ -467,11 +666,6 @@ impl Cli {
         }
     }
 
-    /// Unknown command handler
-    fn cmd_unknown(cmd: &str) {
-        let msg = format!("unknown command: '{}' (try 'help')", cmd);
-        println(&msg);
-    }
 
     /// Print welcome banner
     fn print_welcome() {
