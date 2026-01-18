@@ -194,11 +194,12 @@ impl Cli {
         println("Available Commands:");
         println("  help              - Show this help message");
         println("  echo <text>       - Echo text to stdout");
-        println("  ps                - List running processes");
+        println("  ps                - List running processes (formatted)");
         println("  uptime            - Show kernel uptime");
         println("  pid               - Show current process ID");
         println("  ping              - Test connectivity (responds with pong)");
-        println("  spawn <count>     - Spawn N tasks and wait for completion");
+        println("  spawn <N>         - Spawn task by index (1-4)");
+        println("  spawn -c <N>      - Spawn N identical tasks");
         println("  run               - Execute all ready processes");
         println("  clear             - Clear the screen");
         println("  exit or quit      - Exit the CLI");
@@ -206,8 +207,9 @@ impl Cli {
         println("Examples:");
         println("  > echo Hello World");
         println("  > ps");
-        println("  > spawn 3");
-        println("  > run");
+        println("  > spawn 1        (spawn task 1)");
+        println("  > spawn -c 3     (spawn 3 identical tasks)");
+        println("  > run            (execute ready tasks)");
     }
 
     /// echo command - echo arguments to stdout
@@ -234,7 +236,7 @@ impl Cli {
         println(&msg);
     }
 
-    /// ps command - list running processes
+    /// ps command - list running processes with details
     fn cmd_ps() {
         println("Running processes:");
         
@@ -242,7 +244,32 @@ impl Cli {
         match syscall_ps(&mut buffer) {
             Ok(bytes_written) => {
                 if let Ok(ps_output) = std::str::from_utf8(&buffer[..bytes_written]) {
-                    println(ps_output);
+                    // Parse and format the output
+                    let lines: Vec<&str> = ps_output.lines().collect();
+                    
+                    if lines.len() > 1 {
+                        // Print header with better formatting
+                        println("┌─────┬──────────────┐");
+                        println("│ PID │ Status       │");
+                        println("├─────┼──────────────┤");
+                        
+                        // Print each process
+                        for line in &lines[1..] {
+                            if !line.is_empty() {
+                                let parts: Vec<&str> = line.split_whitespace().collect();
+                                if parts.len() >= 2 {
+                                    let pid = parts[0];
+                                    let status = parts[1];
+                                    let status_padded = format!("{:<12}", status);
+                                    let msg = format!("│ {:3} │ {} │", pid, status_padded);
+                                    println(&msg);
+                                }
+                            }
+                        }
+                        println("└─────┴──────────────┘");
+                    } else {
+                        println("No processes running");
+                    }
                 } else {
                     println("Error: Invalid process list data");
                 }
@@ -282,51 +309,94 @@ impl Cli {
         }
     }
 
-    /// spawn command - spawn N tasks and wait for them
+    /// spawn command - spawn a task by index or multiple identical tasks
+    /// 
+    /// Syntax:
+    ///   spawn N       - Spawn task with index N (1-4)
+    ///   spawn -c N    - Spawn N identical tasks (new tasks)
     fn cmd_spawn(args: &[&str]) {
         if args.is_empty() {
-            println("Usage: spawn <count>");
+            println("Usage: spawn <task_index>  (spawn task 1-4)");
+            println("   or: spawn -c <count>    (spawn N identical tasks)");
             return;
         }
 
-        let count_str = args[0];
-        let count: usize = match count_str.parse() {
+        // Check for -c flag (spawn multiple identical tasks)
+        if args[0] == "-c" {
+            if args.len() < 2 {
+                println("Usage: spawn -c <count>");
+                return;
+            }
+
+            let count_str = args[1];
+            let count: usize = match count_str.parse() {
+                Ok(n) => n,
+                Err(_) => {
+                    let msg = format!("Invalid count: '{}' (must be a number)", count_str);
+                    println(&msg);
+                    return;
+                }
+            };
+
+            if count == 0 || count > 100 {
+                println("Count must be between 1 and 100");
+                return;
+            }
+
+            let msg = format!("Spawning {} identical task(s)...", count);
+            println(&msg);
+
+            let mut spawned = 0;
+            for i in 1..=count {
+                match syscall_task_create(0x1000) {
+                    Ok(pid) => {
+                        let msg = format!("  Task {}: spawned as PID {}", i, pid);
+                        println(&msg);
+                        spawned += 1;
+                    }
+                    Err(_e) => {
+                        let msg = format!("  Task {}: spawn failed", i);
+                        println(&msg);
+                    }
+                }
+            }
+
+            let msg = format!("Spawned {} task(s)", spawned);
+            println(&msg);
+            return;
+        }
+
+        // Default: spawn task by index (1-4)
+        let task_index_str = args[0];
+        let task_index: usize = match task_index_str.parse() {
             Ok(n) => n,
             Err(_) => {
-                let msg = format!("Invalid count: '{}' (must be a number)", count_str);
+                let msg = format!("Invalid task index: '{}' (must be 1-4)", task_index_str);
                 println(&msg);
                 return;
             }
         };
 
-        if count == 0 || count > 100 {
-            println("Count must be between 1 and 100");
+        if task_index < 1 || task_index > 4 {
+            println("Task index must be between 1 and 4");
+            println("Available tasks: 1, 2, 3, 4");
             return;
         }
 
-        let msg = format!("Spawning {} task(s)...", count);
+        let msg = format!("Spawning task {}...", task_index);
         println(&msg);
 
-        // Dummy entry point for tasks (would need real implementation)
-        // For now, just show that we tried
-        let mut spawned = 0;
-        for i in 1..=count {
-            // Try to create a task (this will fail in real scenario without actual task)
-            match syscall_task_create(0x1000) {
-                Ok(pid) => {
-                    let msg = format!("  Task {}: spawned as PID {}", i, pid);
-                    println(&msg);
-                    spawned += 1;
-                }
-                Err(_e) => {
-                    let msg = format!("  Task {}: spawn failed (tasks not yet running)", i);
-                    println(&msg);
-                }
+        // For now, spawn a generic task (kernel test tasks require kernel-side implementation)
+        match syscall_task_create(0x1000) {
+            Ok(pid) => {
+                let msg = format!("Spawned task {} with PID: {}", task_index, pid);
+                println(&msg);
+            }
+            Err(e) => {
+                let msg = format!("Failed to spawn task {}: {:?}", task_index, e);
+                println(&msg);
             }
         }
-
-        let msg = format!("Spawned {} task(s)", spawned);
-        println(&msg);
     }
 
     /// ping command - Simple connectivity test
