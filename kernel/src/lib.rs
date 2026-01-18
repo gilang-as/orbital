@@ -11,6 +11,7 @@ use core::panic::PanicInfo;
 pub mod allocator;
 pub mod binary_loader;
 pub mod context_switch;
+pub mod elf_loader;
 pub mod gdt;
 pub mod input;
 pub mod interrupts;

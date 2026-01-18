@@ -23,31 +23,29 @@ pub fn load_binary(binary: &[u8], name: &str) -> Result<Process, &'static str> {
         return Err("Binary is empty");
     }
 
+    // Phase 5: Parse ELF header to extract entry point
+    let elf_info = crate::elf_loader::parse_elf(binary)
+        .map_err(|_| "Invalid ELF binary format")?;
+
     // Create process structure
-    // The binary will be loaded into the task's stack region for now
-    // A proper implementation would have a separate code/data segment
     let mut process = Process::new_with_name(name);
 
-    // For Phase 4.2: Load binary into process stack
-    // This is a simplified approach - full ELF loader would:
-    // 1. Parse ELF headers
-    // 2. Map code/data segments separately  
-    // 3. Set up memory protection flags
-    // 4. Handle relocations
-    
-    // Copy binary into process stack (max TASK_STACK_SIZE)
+    // Check binary fits in process stack
     if binary.len() > crate::process::TASK_STACK_SIZE {
         return Err("Binary too large for process stack");
     }
     
-    // Copy binary code into the stack space
+    // Copy entire ELF binary into process stack
     let stack_bytes = &mut process.stack[..];
     stack_bytes[..binary.len()].copy_from_slice(binary);
     
-    // Set entry point to start of stack where binary is loaded
-    // The stack base gives us the memory address
+    // Calculate base address of binary in stack
     let stack_base = stack_bytes.as_ptr() as usize;
-    process.entry_point = stack_base;
+    
+    // Set entry point to ELF entry point offset from stack base
+    // ELF entry point is a virtual address, convert to physical
+    process.entry_point = stack_base + elf_info.entry_point as usize;
+
     
     // Set up context for userspace execution:
     // RIP points to _start() of the binary
