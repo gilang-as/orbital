@@ -25,7 +25,7 @@ use alloc::vec::Vec;
 use conquer_once::spin::OnceCell;
 use spin::Mutex;
 
-const TASK_STACK_SIZE: usize = 4096; // 4KB per task
+pub const TASK_STACK_SIZE: usize = 4096; // 4KB per task
 
 /// Unique identifier for a process/task
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

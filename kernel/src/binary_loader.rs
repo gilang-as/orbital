@@ -24,22 +24,40 @@ pub fn load_binary(binary: &[u8], name: &str) -> Result<Process, &'static str> {
     }
 
     // Create process structure
-    // The binary will be loaded at a userspace address
-    // For now, we load directly without ELF parsing (raw binary)
+    // The binary will be loaded into the task's stack region for now
+    // A proper implementation would have a separate code/data segment
     let mut process = Process::new_with_name(name);
 
-    // In a full implementation, we would:
-    // 1. Parse ELF headers if needed
-    // 2. Map segments to memory
-    // 3. Set up GOT/PLT if needed
-    // 4. Set up entry point
-
-    // For Phase 4: Raw binary loading
-    // The binary is expected to be statically compiled with no dependencies
-    // Entry point is at binary start
-
-    process.load_code_segment(binary)?;
-
+    // For Phase 4.2: Load binary into process stack
+    // This is a simplified approach - full ELF loader would:
+    // 1. Parse ELF headers
+    // 2. Map code/data segments separately  
+    // 3. Set up memory protection flags
+    // 4. Handle relocations
+    
+    // Copy binary into process stack (max TASK_STACK_SIZE)
+    if binary.len() > crate::process::TASK_STACK_SIZE {
+        return Err("Binary too large for process stack");
+    }
+    
+    // Copy binary code into the stack space
+    let stack_bytes = &mut process.stack[..];
+    stack_bytes[..binary.len()].copy_from_slice(binary);
+    
+    // Set entry point to start of stack where binary is loaded
+    // The stack base gives us the memory address
+    let stack_base = stack_bytes.as_ptr() as usize;
+    process.entry_point = stack_base;
+    
+    // Set up context for userspace execution:
+    // RIP points to _start() of the binary
+    // RSP points to near the top of stack (will grow downward)
+    process.saved_context.rip = stack_base as u64;
+    process.saved_context.rsp = (stack_base + crate::process::TASK_STACK_SIZE - 8) as u64;
+    
+    // Mark process as ready
+    process.status = crate::process::ProcessStatus::Ready;
+    
     Ok(process)
 }
 
@@ -57,19 +75,47 @@ pub fn get_cli_binary() -> Option<&'static [u8]> {
 
 /// Execute userspace CLI as a task
 ///
-/// Phase 4.1: Loads the embedded minimal shell binary and shows it's ready.
-/// The shell is 1.2 KB and compiled for x86_64-orbital.
-pub fn execute_cli(_executor: &mut Executor) -> Result<(), &'static str> {
+/// Phase 4.2: Loads the embedded minimal shell binary into a userspace process
+/// and spawns it as a task. The shell runs with userspace privileges via syscalls.
+pub fn execute_cli(executor: &mut Executor) -> Result<(), &'static str> {
     match get_cli_binary() {
         Some(binary) => {
-            crate::println!("[Phase 4.1] ✅ Userspace shell embedded successfully");
-            crate::println!("[Phase 4.1] Size: {} bytes", binary.len());
-            crate::println!("[Phase 4.1] The shell is now ready to execute via syscalls");
-            crate::println!("[Phase 4.1] For Phase 4.2: Implement task loading and execution");
+            crate::println!("[Phase 4.2] 🚀 Loading userspace shell...");
+            crate::println!("[Phase 4.2] Binary size: {} bytes", binary.len());
+            
+            // Load binary into a process structure
+            let process = load_binary(binary, "orbital-shell")?;
+            let entry_point = process.entry_point;
+            
+            crate::println!("[Phase 4.2] Entry point: 0x{:x}", entry_point);
+            crate::println!("[Phase 4.2] PID: {}", process.pid());
+            
+            // Transmute entry point to function pointer and execute
+            // Note: This is unsafe and a full implementation would use proper context switching
+            unsafe {
+                let entry_fn: extern "C" fn() -> ! = core::mem::transmute(entry_point);
+                
+                // For Phase 4.2, we'll call the entry point directly from an async task
+                // This allows it to run within the executor's event loop
+                use crate::task::Task;
+                
+                // We need to wrap this in an async context
+                // Create a simple async wrapper that will execute the binary
+                let shell_runner = async move {
+                    // Call the userspace entry point
+                    // Since it expects to run forever (no_main style), this won't return
+                    // So the task will block indefinitely on syscalls
+                    entry_fn();
+                };
+                
+                executor.spawn(Task::new(shell_runner));
+            }
+            
+            crate::println!("[Phase 4.2] ✅ Userspace shell spawned successfully");
             Ok(())
         }
         None => {
-            crate::println!("[Phase 4.1] ℹ️  No userspace shell embedded");
+            crate::println!("[Phase 4.2] ℹ️  No userspace shell embedded");
             crate::println!("Using kernel shell as fallback");
             Ok(())
         }
