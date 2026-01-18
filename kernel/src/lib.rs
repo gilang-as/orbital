@@ -17,6 +17,7 @@ pub mod input;
 pub mod interrupts;
 pub mod ipc;
 pub mod memory;
+pub mod multiprocess;
 pub mod process;
 pub mod scheduler;
 pub mod serial;

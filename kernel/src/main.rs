@@ -36,15 +36,16 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
     let mut executor = Executor::new();
     executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
     
-    // Phase 4.2: Load and execute embedded userspace CLI as a task
-    match orbital_kernel::binary_loader::execute_cli(&mut executor) {
+    // Phase 6: Load and execute multiple concurrent userspace shells as tasks
+    match orbital_kernel::multiprocess::execute_multi_cli(3, &mut executor) {
         Ok(()) => {
-            // Userspace shell was spawned
-            // If we reach here, execution falls through to the executor
+            // Multiple userspace shells were spawned
+            crate::println!("[Phase 6] All shells spawned successfully");
         }
         Err(e) => {
-            println!("Error loading userspace shell: {}", e);
-            // Fall back to kernel shell
+            println!("Error loading multiprocess shells: {}", e);
+            // Fall back to single kernel shell
+            println!("Falling back to kernel shell");
             executor.spawn(Task::new(orbital_kernel::task::cli::shell()));
         }
     }
