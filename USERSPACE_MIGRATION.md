@@ -134,22 +134,21 @@ These represent kernel code that needs exposure to userspace via syscalls.
 Userspace should own process policy decisions.
 
 ### 4.1 Process Lifecycle
-- [ ] Verify `sys_task_create` works from userspace
-  - **Current status**: Implemented in syscall.rs ✅
-  - **Test**: Call from CLI spawn command
+- [x] Verify `sys_task_create` works from userspace ✅ VERIFIED
+  - **Status**: Used by spawn command to create tasks
+  - **Implementation**: Spawn command successfully creates tasks via syscall
   - **Blocker**: None
 
-- [ ] Verify `sys_task_wait` works from userspace
-  - **Current status**: Implemented in syscall.rs ✅
-  - **Test**: Call from CLI after spawn
+- [x] Verify `sys_task_wait` works from userspace ✅ VERIFIED
+  - **Status**: New wait command added to test waiting for tasks
+  - **Implementation**: wait <PID> gets exit code from completed task
   - **Blocker**: None
 
 ### 4.2 Process Scheduling Decisions
-- [ ] Move `execute_all_ready()` policy to userspace
-  - **Current**: Kernel shell's `run` command calls this
-  - **Target**: Userspace CLI calls `sys_run_ready()` syscall
-  - **Implementation**: Add `sys_run_ready` syscall (see 1.2)
-  - **Blocker**: `sys_run_ready` syscall needed
+- [x] Move `execute_all_ready()` policy to userspace ✅ COMPLETE
+  - **Status**: sys_run_ready syscall implemented and working
+  - **Implementation**: run command executes all ready processes via syscall
+  - **Result**: Userspace now controls when tasks execute
 
 - [ ] Consider supervisor/task manager process
   - **Priority**: MEDIUM - future enhancement
@@ -323,13 +322,14 @@ Do in this sequence to minimize risk.
 ✅ 3. Add missing CLI commands (ping, clear, run) - DONE
 ✅ 4. Enhance spawn and ps commands - DONE
 ✅ 5. TTY/Display Management (Section 3) - DONE
-   - sys_write(1) for output ✅
-   - sys_clear_screen for clearing ✅
-   - Keyboard input buffer working ✅
-⏳ 6. Test all CLI commands work - IN PROGRESS
-7. Update boot sequence (optional, can defer)
-8. Remove kernel shell.rs (optional, can defer)
-9. Comprehensive integration testing
+✅ 6. Process Management (Section 4) - DONE
+   - sys_task_create verified ✅
+   - sys_task_wait verified (wait command) ✅
+   - sys_run_ready verified (run command) ✅
+⏳ 7. Test all CLI commands work - IN PROGRESS
+8. Update boot sequence (optional, can defer)
+9. Remove kernel shell.rs (optional, can defer)
+10. Comprehensive integration testing
 ```
 
 ---
@@ -392,4 +392,5 @@ Phase 3 can focus on:
 | 2026-01-18 | 1.1 | Critical blockers resolved - syscalls implemented and CLI commands added |
 | 2026-01-18 | 1.2 | Enhancement phase - spawn/ps commands enhanced, all 7 commands now complete |
 | 2026-01-18 | 1.3 | Section 3 complete - TTY/Display Management verified working |
+| 2026-01-18 | 1.4 | Section 4 complete - Process Management all syscalls verified and working |
 
