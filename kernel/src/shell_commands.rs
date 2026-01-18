@@ -9,7 +9,6 @@
 ///
 /// This maintains the illusion that commands work while we prepare for the
 /// real userspace shell binary in Phase 3.
-
 use crate::{print, println};
 
 /// Execute a shell command (kernel version - temporary for Phase 2.5)
@@ -59,7 +58,9 @@ fn cmd_echo(args: &[&str]) {
         println!("");
     } else {
         for (i, arg) in args.iter().enumerate() {
-            if i > 0 { print!(" "); }
+            if i > 0 {
+                print!(" ");
+            }
             print!("{}", arg);
         }
         println!();
@@ -89,7 +90,7 @@ fn cmd_spawn(args: &[&str]) {
         println!("Usage: spawn <count>");
         return;
     }
-    
+
     if let Ok(count) = args[0].parse::<usize>() {
         for i in 0..count {
             if let Some(entry) = crate::tasks::get_test_task(((i % 4) + 1) as usize) {
@@ -108,7 +109,7 @@ fn cmd_wait(args: &[&str]) {
         println!("Usage: wait <pid>");
         return;
     }
-    
+
     if let Ok(pid) = args[0].parse::<u64>() {
         if pid > 0 {
             println!("Waiting for PID {}...", pid);
@@ -132,4 +133,3 @@ fn cmd_exit() {
     println!("Exiting...");
     crate::hlt_loop();
 }
-

@@ -80,18 +80,18 @@ type SyscallHandler = fn(usize, usize, usize, usize, usize, usize) -> SysResult;
 /// Syscall dispatch table
 /// Maps syscall numbers to handler functions
 const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
-    Some(sys_hello),       // 0
-    Some(sys_log),         // 1
-    Some(sys_write),       // 2
-    Some(sys_exit),        // 3
-    Some(sys_read),        // 4
-    Some(sys_task_create), // 5
-    Some(sys_task_wait),   // 6
-    Some(sys_get_pid),     // 7
-    Some(sys_ps),          // 8
-    Some(sys_uptime),      // 9
+    Some(sys_hello),        // 0
+    Some(sys_log),          // 1
+    Some(sys_write),        // 2
+    Some(sys_exit),         // 3
+    Some(sys_read),         // 4
+    Some(sys_task_create),  // 5
+    Some(sys_task_wait),    // 6
+    Some(sys_get_pid),      // 7
+    Some(sys_ps),           // 8
+    Some(sys_uptime),       // 9
     Some(sys_clear_screen), // 10
-    Some(sys_run_ready),   // 11
+    Some(sys_run_ready),    // 11
 ];
 
 /// Syscall number constants
@@ -588,7 +588,7 @@ fn sys_uptime(
 }
 
 /// sys_clear_screen - Clear the VGA display
-/// 
+///
 /// Clears the entire screen by clearing the VGA buffer.
 /// Called by userspace to implement the `clear` command.
 ///
@@ -610,7 +610,7 @@ fn sys_clear_screen(
 }
 
 /// sys_run_ready - Execute all ready processes
-/// 
+///
 /// Executes all processes in the Ready state, running them synchronously.
 /// Called by userspace to implement the `run` command.
 ///

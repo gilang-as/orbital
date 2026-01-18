@@ -1,5 +1,6 @@
+use crate::println;
 /// Shell task - reads input and executes commands
-/// 
+///
 /// PHASE 2.5 IMPLEMENTATION (Kernel-based shell):
 /// This task reads from the input buffer and executes shell commands.
 /// All command logic is in crate::shell_commands for reuse.
@@ -12,9 +13,7 @@
 /// 4. All commands will still use the same logic, invoked via syscalls
 ///
 /// This maintains the policy/mechanism separation at the architecture level.
-
 use alloc::string::String;
-use crate::println;
 
 pub async fn shell() {
     println!("╔════════════════════════════════════════╗");
@@ -26,7 +25,7 @@ pub async fn shell() {
     loop {
         // Read a line from keyboard input buffer
         let line = read_line().await;
-        
+
         if line.is_empty() {
             continue;
         }
@@ -39,12 +38,12 @@ pub async fn shell() {
 /// Read a line from the input buffer (blocks until newline)
 async fn read_line() -> String {
     let mut line = String::new();
-    
+
     loop {
         // Read from input buffer
         let mut buf = [0u8; 256];
         let n = crate::input::read_input(&mut buf);
-        
+
         if n > 0 {
             for i in 0..n {
                 let ch = buf[i] as char;
@@ -62,10 +61,8 @@ async fn read_line() -> String {
                 }
             }
         }
-        
+
         // Yield to other tasks
         crate::task::keyboard::ScancodeStream::new();
     }
 }
-
-

@@ -4,7 +4,7 @@ use futures_util::stream::StreamExt;
 use pc_keyboard::{DecodedKey, HandleControl, Keyboard, ScancodeSet1, layouts};
 
 /// Terminal I/O handler - minimal keyboard/display plumbing only
-/// 
+///
 /// This task:
 /// 1. Reads keyboard input from hardware
 /// 2. Echoes characters to VGA screen for user feedback  
