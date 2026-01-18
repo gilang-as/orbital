@@ -35,6 +35,7 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
+    executor.spawn(Task::new(orbital_kernel::task::cli::shell()));
     executor.run();
 }
 
