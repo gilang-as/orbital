@@ -1,12 +1,18 @@
-/// Shared shell command logic - kernel uses this now, userspace will use via syscalls in Phase 3
+/// TEMPORARY: Kernel shell command dispatch - PHASE 2.5 ONLY
 ///
-/// This module contains all shell commands and can be:
-/// - Used directly by kernel shell task (Phase 2.5 - now)
-/// - Accessed via syscalls by userspace shell binary (Phase 3 - future)
+/// This module is a temporary bridge to Phase 3. The authoritative shell commands
+/// are now in userspace/cli/src/commands.rs
+///
+/// In Phase 2.5, the kernel shell task uses this to execute commands directly.
+/// In Phase 3, this entire module will be deleted, and the userspace binary
+/// will execute the same commands via syscalls.
+///
+/// This maintains the illusion that commands work while we prepare for the
+/// real userspace shell binary in Phase 3.
 
 use crate::{print, println};
 
-/// Execute a shell command
+/// Execute a shell command (kernel version - temporary for Phase 2.5)
 pub fn execute_command(command: &str) {
     let parts: alloc::vec::Vec<&str> = command.split_whitespace().collect();
     if parts.is_empty() {
@@ -28,6 +34,10 @@ pub fn execute_command(command: &str) {
         _ => println!("unknown command: '{}' (try 'help')", parts[0]),
     }
 }
+
+// Note: Commands below call kernel functions directly.
+// In Phase 3, userspace version will call syscalls instead.
+// The logic is identical - only the mechanism changes.
 
 fn cmd_help() {
     println!("Available commands:");
@@ -122,3 +132,4 @@ fn cmd_exit() {
     println!("Exiting...");
     crate::hlt_loop();
 }
+
