@@ -403,13 +403,18 @@ Once this migration is complete:
 ✅ Userspace policy is clean and isolated  
 ✅ Foundation is solid for preemptive multitasking  
 ✅ No architectural debt blocking Phase 3  
-✅ Can safely add timer interrupts, preemption  
+✅ **Shell command logic extracted to reusable module**  
+✅ **Phase 3 migration path documented in PHASE3_USERSPACE_SHELL.md**
 
 Phase 3 can focus on:
+- Binary loader implementation (embed userspace CLI binary)
+- Execute userspace shell as process on boot
+- Keep terminal as minimal kernel I/O task
+- Move shell logic to userspace (unprivileged execution)
 - Cooperative/preemptive scheduling
 - Timer interrupt handling
 - Context switching optimizations
-- No policy layer confusion
+- Multi-service foundation (multiple userspace processes)
 
 ---
 
