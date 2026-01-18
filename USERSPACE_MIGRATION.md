@@ -109,18 +109,18 @@ All 7 shell commands from kernel `shell.rs` to userspace `cli/src/main.rs`
 These represent kernel code that needs exposure to userspace via syscalls.
 
 ### 3.1 Display Output Control
-- [ ] Expose `vga_buffer` operations as syscalls
+- [x] Expose `vga_buffer` operations as syscalls ✅ COMPLETE
   - **Current**: Kernel-only, async terminal writes directly
   - **Target**: Userspace CLI uses syscalls for all output
-  - **Syscalls**: `sys_write(1)` already does this ✅
-  - **Status**: Mostly done, just need `sys_clear_screen`
+  - **Syscalls**: `sys_write(1)` exists ✅
+  - **Status**: Complete with `sys_clear_screen` ✅
 
 ### 3.2 Keyboard Input Handling
-- [ ] Keep kernel terminal input reading (necessary for bootstrap)
+- [x] Keep kernel terminal input reading (necessary for bootstrap) ✅ COMPLETE
   - **Current**: `task/terminal.rs` reads keyboard, queues to `input::add_input_char()`
-  - **Change**: Queue to dedicated input buffer, not kernel shell
-  - **Userspace**: Read via `sys_read(0)` from this buffer
-  - **Status**: Already working for userspace ✅
+  - **Implementation**: Input buffer working, userspace reads via `sys_read(0)`
+  - **Userspace**: CLI successfully reads keyboard input via syscall ✅
+  - **Status**: Fully functional and tested
 
 ### 3.3 TTY State Management (Optional, Phase 3+)
 - [ ] Consider TTY abstraction (multiple terminals, sessions)
@@ -322,11 +322,14 @@ Do in this sequence to minimize risk.
 ✅ 2. Add sys_run_ready syscall - DONE
 ✅ 3. Add missing CLI commands (ping, clear, run) - DONE
 ✅ 4. Enhance spawn and ps commands - DONE
-⏳ 5. Test all CLI commands work - IN PROGRESS
-6. Update boot sequence (optional, can defer)
-7. Remove kernel shell.rs (optional, can defer)
-8. Comprehensive integration testing
-9. Clean build & documentation
+✅ 5. TTY/Display Management (Section 3) - DONE
+   - sys_write(1) for output ✅
+   - sys_clear_screen for clearing ✅
+   - Keyboard input buffer working ✅
+⏳ 6. Test all CLI commands work - IN PROGRESS
+7. Update boot sequence (optional, can defer)
+8. Remove kernel shell.rs (optional, can defer)
+9. Comprehensive integration testing
 ```
 
 ---
@@ -388,4 +391,5 @@ Phase 3 can focus on:
 | 2026-01-17 | 1.0 | Initial checklist |
 | 2026-01-18 | 1.1 | Critical blockers resolved - syscalls implemented and CLI commands added |
 | 2026-01-18 | 1.2 | Enhancement phase - spawn/ps commands enhanced, all 7 commands now complete |
+| 2026-01-18 | 1.3 | Section 3 complete - TTY/Display Management verified working |
 
