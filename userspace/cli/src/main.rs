@@ -18,7 +18,8 @@
 //! Kernel provides I/O syscalls, userspace provides command logic.
 
 use orbital_ipc::{syscall_task_create, syscall_task_wait, syscall_write, 
-                   syscall_get_pid, syscall_ps, syscall_uptime};
+                   syscall_get_pid, syscall_ps, syscall_uptime, 
+                   syscall_clear_screen, syscall_run_ready};
 
 // ============================================================================
 // Syscall Wrappers
@@ -178,6 +179,9 @@ impl Cli {
             "uptime" => Self::cmd_uptime(),
             "pid" => Self::cmd_pid(),
             "spawn" => Self::cmd_spawn(args),
+            "ping" => Self::cmd_ping(),
+            "run" => Self::cmd_run(),
+            "clear" => Self::cmd_clear(),
             "exit" | "quit" => return false,
             _ => Self::cmd_unknown(command),
         }
@@ -192,14 +196,18 @@ impl Cli {
         println("  echo <text>       - Echo text to stdout");
         println("  ps                - List running processes");
         println("  uptime            - Show kernel uptime");
-        println("  spawn <count>     - Spawn N tasks and wait for completion");
         println("  pid               - Show current process ID");
+        println("  ping              - Test connectivity (responds with pong)");
+        println("  spawn <count>     - Spawn N tasks and wait for completion");
+        println("  run               - Execute all ready processes");
+        println("  clear             - Clear the screen");
         println("  exit or quit      - Exit the CLI");
         println("");
         println("Examples:");
         println("  > echo Hello World");
         println("  > ps");
         println("  > spawn 3");
+        println("  > run");
     }
 
     /// echo command - echo arguments to stdout
@@ -319,6 +327,39 @@ impl Cli {
 
         let msg = format!("Spawned {} task(s)", spawned);
         println(&msg);
+    }
+
+    /// ping command - Simple connectivity test
+    fn cmd_ping() {
+        println("pong");
+    }
+
+    /// run command - Execute all ready processes
+    fn cmd_run() {
+        println("Executing all ready processes...");
+        match syscall_run_ready() {
+            Ok(count) => {
+                let msg = format!("Executed {} process(es)", count);
+                println(&msg);
+            }
+            Err(e) => {
+                let msg = format!("Error executing processes: {:?}", e);
+                println(&msg);
+            }
+        }
+    }
+
+    /// clear command - Clear the screen
+    fn cmd_clear() {
+        match syscall_clear_screen() {
+            Ok(_) => {
+                // Screen is cleared, no output needed
+            }
+            Err(e) => {
+                let msg = format!("Error clearing screen: {:?}", e);
+                println(&msg);
+            }
+        }
     }
 
     /// Unknown command handler
