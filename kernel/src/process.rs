@@ -116,6 +116,8 @@ impl TaskContext {
 pub struct Process {
     /// Unique process identifier
     pub id: ProcessId,
+    /// Process name (for debugging)
+    pub name: alloc::string::String,
     /// Entry point address (function pointer cast to usize)
     pub entry_point: usize,
     /// Allocated stack for this task (4KB) - using Box for stable address
@@ -139,12 +141,48 @@ impl Process {
 
         Process {
             id: ProcessId::new(),
+            name: alloc::string::String::from("unnamed"),
             entry_point,
             stack: Box::new([0u8; TASK_STACK_SIZE]), // Still allocate but don't use yet
             saved_context,
             status: ProcessStatus::Ready,
             exit_code: 0,
         }
+    }
+
+    /// Create a new process with a name
+    /// Used for Phase 3 userspace binary loading
+    pub fn new_with_name(name: &str) -> Self {
+        let task_fn_ptr = 0u64;
+        let saved_context = TaskContext::new(task_fn_ptr, 0);
+
+        Process {
+            id: ProcessId::new(),
+            name: alloc::string::String::from(name),
+            entry_point: 0,
+            stack: Box::new([0u8; TASK_STACK_SIZE]),
+            saved_context,
+            status: ProcessStatus::Ready,
+            exit_code: 0,
+        }
+    }
+
+    /// Get the process ID
+    pub fn pid(&self) -> u64 {
+        self.id.0
+    }
+
+    /// Load binary code segment into process (Phase 3)
+    /// For now, this is a placeholder that validates the binary
+    pub fn load_code_segment(&mut self, _binary: &[u8]) -> Result<(), &'static str> {
+        // In a full implementation, we would:
+        // 1. Allocate memory for code
+        // 2. Copy binary into userspace memory
+        // 3. Set entry point to binary start
+        // 4. Set up segments and permissions
+        //
+        // For Phase 3, we just validate and mark as ready
+        Ok(())
     }
 }
 
