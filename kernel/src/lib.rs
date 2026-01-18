@@ -18,7 +18,7 @@ pub mod memory;
 pub mod process;
 pub mod scheduler;
 pub mod serial;
-pub mod shell;
+pub mod shell_commands;
 pub mod syscall;
 pub mod task;
 pub mod task_entry;

@@ -80,17 +80,18 @@ type SyscallHandler = fn(usize, usize, usize, usize, usize, usize) -> SysResult;
 /// Syscall dispatch table
 /// Maps syscall numbers to handler functions
 const SYSCALL_TABLE: &[Option<SyscallHandler>] = &[
-    Some(sys_hello),       // 0
-    Some(sys_log),         // 1
-    Some(sys_write),       // 2
-    Some(sys_exit),        // 3
-    Some(sys_read),        // 4
-    Some(sys_task_create), // 5
-    Some(sys_task_wait),   // 6
-    Some(sys_get_pid),     // 7
-    Some(sys_ps),          // 8
-    Some(sys_uptime),      // 9
-                           // More syscalls go here
+    Some(sys_hello),        // 0
+    Some(sys_log),          // 1
+    Some(sys_write),        // 2
+    Some(sys_exit),         // 3
+    Some(sys_read),         // 4
+    Some(sys_task_create),  // 5
+    Some(sys_task_wait),    // 6
+    Some(sys_get_pid),      // 7
+    Some(sys_ps),           // 8
+    Some(sys_uptime),       // 9
+    Some(sys_clear_screen), // 10
+    Some(sys_run_ready),    // 11
 ];
 
 /// Syscall number constants
@@ -105,6 +106,8 @@ pub mod nr {
     pub const SYS_GET_PID: usize = 7;
     pub const SYS_PS: usize = 8;
     pub const SYS_UPTIME: usize = 9;
+    pub const SYS_CLEAR_SCREEN: usize = 10;
+    pub const SYS_RUN_READY: usize = 11;
 }
 
 /// Main syscall dispatcher
@@ -582,6 +585,50 @@ fn sys_uptime(
 ) -> SysResult {
     let seconds = crate::scheduler::get_elapsed_seconds() as usize;
     Ok(seconds)
+}
+
+/// sys_clear_screen - Clear the VGA display
+///
+/// Clears the entire screen by clearing the VGA buffer.
+/// Called by userspace to implement the `clear` command.
+///
+/// # Arguments
+/// None
+///
+/// # Returns
+/// - Ok(0): Success
+fn sys_clear_screen(
+    _arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
+    crate::vga_buffer::clear_screen();
+    Ok(0)
+}
+
+/// sys_run_ready - Execute all ready processes
+///
+/// Executes all processes in the Ready state, running them synchronously.
+/// Called by userspace to implement the `run` command.
+///
+/// # Arguments
+/// None
+///
+/// # Returns
+/// - Ok(count): Number of processes executed
+fn sys_run_ready(
+    _arg1: usize,
+    _arg2: usize,
+    _arg3: usize,
+    _arg4: usize,
+    _arg5: usize,
+    _arg6: usize,
+) -> SysResult {
+    let count = crate::process::execute_all_ready();
+    Ok(count as usize)
 }
 
 #[cfg(test)]

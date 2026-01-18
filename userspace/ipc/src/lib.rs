@@ -374,6 +374,67 @@ pub fn syscall_uptime() -> SyscallResult<u64> {
     }
 }
 
+/// syscall_clear_screen - Clear the VGA display
+/// 
+/// Clears the entire screen by invoking sys_clear_screen.
+/// 
+/// # Returns
+/// - Ok(()): Success
+/// - Err(SyscallError): If syscall failed
+pub fn syscall_clear_screen() -> SyscallResult<()> {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 10_i64 => result,  // syscall number 10 (SYS_CLEAR_SCREEN)
+            clobber_abi("C"),
+        );
+
+        if result >= 0 {
+            Ok(())
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(SyscallError::NotImplemented)
+    }
+}
+
+/// syscall_run_ready - Execute all ready processes
+/// 
+/// Runs all processes currently in the Ready state, executing them synchronously.
+/// This is used by the userspace shell's `run` command.
+/// 
+/// # Returns
+/// - Ok(count): Number of processes executed
+/// - Err(SyscallError): If syscall failed
+pub fn syscall_run_ready() -> SyscallResult<usize> {
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        let result: i64;
+        core::arch::asm!(
+            "syscall",
+            inout("rax") 11_i64 => result,  // syscall number 11 (SYS_RUN_READY)
+            clobber_abi("C"),
+        );
+
+        if result >= 0 {
+            Ok(result as usize)
+        } else {
+            Err(SyscallError::from_return_value(result).unwrap_or(SyscallError::Error))
+        }
+    }
+
+    #[cfg(not(target_arch = "x86_64"))]
+    {
+        Err(SyscallError::NotImplemented)
+    }
+}
+
 /// Protocol version for IPC messages
 pub const IPC_PROTOCOL_VERSION: u32 = 1;
 
