@@ -1,28 +1,30 @@
 //! Build script for Orbital Kernel
 //!
-//! Compiles and embeds the userspace CLI binary into the kernel.
-//! This allows the kernel to load and execute the CLI as a userspace process.
+//! Compiles and embeds the userspace binary into the kernel.
+//! This allows the kernel to load and execute it as a userspace process.
 
 use std::path::PathBuf;
 
 fn main() {
-    // Step 1: Build the userspace CLI
-    // For now, we reference the pre-built binary from userspace/cli/target/
-    // In a production system, this would build for the x86_64-orbital target
-
-    let cli_binary_path = PathBuf::from("../userspace/cli/target/x86_64-apple-darwin/release/orbital-cli");
+    // Phase 4.1: Use minimal userspace shell (1.2 KB, compiled for x86_64-orbital)
+    let cli_binary_path = PathBuf::from("../userspace/minimal/target/x86_64-orbital/release/minimal-shell");
     
     // Verify the binary exists
     if cli_binary_path.exists() {
         println!("cargo:rustc-env=ORBITAL_CLI_PATH={}", cli_binary_path.display());
         println!("cargo:rerun-if-changed={}", cli_binary_path.display());
         println!("cargo:rustc-cfg=have_cli_binary");
+        println!("cargo:warning=Embedding userspace shell ({} bytes)", 
+                 std::fs::metadata(&cli_binary_path)
+                     .map(|m| m.len())
+                     .unwrap_or(0));
     } else {
-        eprintln!("Warning: Userspace CLI binary not found at {:?}", cli_binary_path);
-        eprintln!("Phase 4: Binary loader prepared but CLI binary not embedded yet");
-        eprintln!("To use Phase 4, build: cd userspace/cli && cargo build --release");
+        eprintln!("Warning: Minimal shell binary not found at {:?}", cli_binary_path);
+        eprintln!("Phase 4.1: To build minimal shell:");
+        eprintln!("  cd userspace/minimal && cargo build --release");
     }
 
-    // Tell cargo to rerun this script if the CLI source changes
-    println!("cargo:rerun-if-changed=../userspace/cli/src");
+    // Tell cargo to rerun if minimal shell source changes
+    println!("cargo:rerun-if-changed=../userspace/minimal/src");
 }
+

@@ -8,6 +8,7 @@ exclude = [
     "userspace/ipc",
     "userspace/managementd",
     "userspace/cli",
+    "userspace/minimal",
 ]
 resolver = "2"
 default-members = ["boot"]

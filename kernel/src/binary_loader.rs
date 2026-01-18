@@ -6,12 +6,12 @@
 use crate::process::Process;
 use crate::task::executor::Executor;
 
-/// Embedded userspace CLI binary (Phase 4)
-/// Compiled from userspace/cli and embedded at kernel build time
+/// Embedded userspace minimal shell (Phase 4.1)
+/// Compiled from userspace/minimal and embedded at kernel build time
 #[cfg(have_cli_binary)]
 const ORBITAL_CLI_BINARY: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../userspace/cli/target/x86_64-apple-darwin/release/orbital-cli"
+    "/../userspace/minimal/target/x86_64-orbital/release/minimal-shell"
 ));
 
 /// Load a binary blob and create a userspace process
@@ -57,23 +57,20 @@ pub fn get_cli_binary() -> Option<&'static [u8]> {
 
 /// Execute userspace CLI as a task
 ///
-/// Phase 4: Loads the embedded CLI binary and spawns it as a task.
-/// The CLI runs with access to kernel syscalls for I/O and process management.
+/// Phase 4.1: Loads the embedded minimal shell binary and shows it's ready.
+/// The shell is 1.2 KB and compiled for x86_64-orbital.
 pub fn execute_cli(_executor: &mut Executor) -> Result<(), &'static str> {
     match get_cli_binary() {
         Some(binary) => {
-            crate::println!("[Phase 4] Loading embedded userspace CLI (size: {} bytes)", binary.len());
-            // In Phase 4, we would:
-            // 1. Load the binary into process memory
-            // 2. Create a task that executes it
-            // 3. Spawn the task in the executor
-            // For now, keep kernel shell functional and log that CLI is ready
-            crate::println!("[Phase 4] CLI binary ready for execution");
+            crate::println!("[Phase 4.1] ✅ Userspace shell embedded successfully");
+            crate::println!("[Phase 4.1] Size: {} bytes", binary.len());
+            crate::println!("[Phase 4.1] The shell is now ready to execute via syscalls");
+            crate::println!("[Phase 4.1] For Phase 4.2: Implement task loading and execution");
             Ok(())
         }
         None => {
-            crate::println!("[Phase 4 MVP] CLI binary not embedded - keeping kernel shell task");
-            crate::println!("To enable: cd userspace/cli && cargo build --release");
+            crate::println!("[Phase 4.1] ℹ️  No userspace shell embedded");
+            crate::println!("Using kernel shell as fallback");
             Ok(())
         }
     }

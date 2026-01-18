@@ -1,0 +1,16 @@
+[package]
+name = "orbital-minimal-shell"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "minimal-shell"
+path = "src/main.rs"
+
+# Build for x86_64-unknown-linux-gnu (bare-metal compatible x86_64)
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
