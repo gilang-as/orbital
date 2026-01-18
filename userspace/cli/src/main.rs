@@ -179,6 +179,7 @@ impl Cli {
             "uptime" => Self::cmd_uptime(),
             "pid" => Self::cmd_pid(),
             "spawn" => Self::cmd_spawn(args),
+            "wait" => Self::cmd_wait(args),
             "ping" => Self::cmd_ping(),
             "run" => Self::cmd_run(),
             "clear" => Self::cmd_clear(),
@@ -200,6 +201,7 @@ impl Cli {
         println("  ping              - Test connectivity (responds with pong)");
         println("  spawn <N>         - Spawn task by index (1-4)");
         println("  spawn -c <N>      - Spawn N identical tasks");
+        println("  wait <PID>        - Wait for a task to complete (get exit code)");
         println("  run               - Execute all ready processes");
         println("  clear             - Clear the screen");
         println("  exit or quit      - Exit the CLI");
@@ -208,6 +210,7 @@ impl Cli {
         println("  > echo Hello World");
         println("  > ps");
         println("  > spawn 1        (spawn task 1)");
+        println("  > wait 1         (wait for PID 1 to complete)");
         println("  > spawn -c 3     (spawn 3 identical tasks)");
         println("  > run            (execute ready tasks)");
     }
@@ -394,6 +397,38 @@ impl Cli {
             }
             Err(e) => {
                 let msg = format!("Failed to spawn task {}: {:?}", task_index, e);
+                println(&msg);
+            }
+        }
+    }
+
+    /// wait command - Wait for a task to complete and get exit code
+    fn cmd_wait(args: &[&str]) {
+        if args.is_empty() {
+            println("Usage: wait <PID>");
+            return;
+        }
+
+        let pid_str = args[0];
+        let pid: u64 = match pid_str.parse() {
+            Ok(n) => n,
+            Err(_) => {
+                let msg = format!("Invalid PID: '{}' (must be a number)", pid_str);
+                println(&msg);
+                return;
+            }
+        };
+
+        let msg = format!("Waiting for task {} to complete...", pid);
+        println(&msg);
+
+        match syscall_task_wait(pid) {
+            Ok(exit_code) => {
+                let msg = format!("Task {} exited with code: {}", pid, exit_code);
+                println(&msg);
+            }
+            Err(e) => {
+                let msg = format!("Error waiting for task {}: {:?}", pid, e);
                 println(&msg);
             }
         }
