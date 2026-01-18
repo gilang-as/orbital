@@ -35,7 +35,21 @@ fn kernel_main(boot_info: &'static BootInfo) -> ! {
 
     let mut executor = Executor::new();
     executor.spawn(Task::new(orbital_kernel::task::terminal::terminal()));
-    executor.spawn(Task::new(orbital_kernel::task::cli::shell()));
+    
+    // Phase 4: Try to load embedded userspace CLI
+    // If not available, fall back to kernel shell task
+    match orbital_kernel::binary_loader::execute_cli(&mut executor) {
+        Ok(()) => {
+            // CLI loader executed (either real or placeholder)
+            // For Phase 4 MVP: kernel shell still runs as fallback
+            executor.spawn(Task::new(orbital_kernel::task::cli::shell()));
+        }
+        Err(e) => {
+            println!("Warning: Failed to load CLI: {}", e);
+            executor.spawn(Task::new(orbital_kernel::task::cli::shell()));
+        }
+    }
+    
     executor.run();
 }
 
