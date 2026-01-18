@@ -1,11 +1,12 @@
-//! Userspace Shell for Orbital OS (Phase 9)
+//! Userspace Shell for Orbital OS (Phase 10)
 //!
-//! Full-featured shell running entirely in userspace via syscalls.
+//! Full-featured interactive shell running entirely in userspace via syscalls.
 //! Implements command parsing and execution with syscall wrappers.
+//! Phase 10 adds stdin input reading via sys_read.
 //!
 //! Compiled for: x86_64-orbital (static, no_std)
 //! Entry point: _start()
-//! Features: help, echo, ps, pid, uptime, clear, exit
+//! Features: help, echo, ps, pid, uptime, clear, exit (interactive)
 
 #![no_std]
 #![no_main]
@@ -29,6 +30,14 @@ fn syscall(number: i64, arg1: i64, arg2: i64, arg3: i64) -> i64 {
         );
     }
     result
+}
+
+/// sys_read - Read from stdin (syscall #4, fd=0)
+/// Returns number of bytes read
+fn read_line(buffer: &mut [u8]) -> usize {
+    let ptr = buffer.as_ptr() as i64;
+    let len = buffer.len() as i64;
+    syscall(4, 0, ptr, len) as usize  // fd=0 (stdin), ptr, len
 }
 
 /// Write text via sys_write (syscall #2)
@@ -109,25 +118,35 @@ fn itoa(mut n: i64) -> &'static str {
     }
 }
 
-/// Main shell loop
+/// Main shell loop with interactive input
 #[no_mangle]
 pub extern "C" fn main() {
-    writeln("[Phase 9] 🚀 Userspace Shell Starting");
-    writeln("[Phase 9] Commands: help, echo, pid, uptime, ps, clear, exit");
+    writeln("[Phase 10] 🚀 Interactive Userspace Shell Starting");
+    writeln("[Phase 10] Type 'help' for commands");
     writeln("");
+    
+    let mut input_buffer = [0u8; 256]; // 256 byte input buffer
     
     loop {
         write("shell> ");
         
-        // Note: Full implementation would read stdin via sys_read
-        // For Phase 9 MVP, we exit to prevent infinite blocking
-        writeln("help");
-        execute_command("help");
-        writeln("");
+        // Read input from stdin via sys_read
+        let n = read_line(&mut input_buffer);
         
-        // Exit after demonstrating
-        writeln("Exiting (full input reading in Phase 10)");
-        syscall(3, 0, 0, 0);
+        if n == 0 {
+            continue; // No input
+        }
+        
+        // Convert buffer to string slice (up to newline)
+        let input_str = if let Ok(s) = core::str::from_utf8(&input_buffer[..n]) {
+            s
+        } else {
+            writeln("[ERROR] Invalid UTF-8 input");
+            continue;
+        };
+        
+        // Execute command
+        execute_command(input_str);
     }
 }
 

@@ -78,8 +78,25 @@ pub async fn print_keypresses() {
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
                 match key {
-                    DecodedKey::Unicode(character) => print!("{}", character),
-                    DecodedKey::RawKey(key) => print!("{:?}", key),
+                    DecodedKey::Unicode(character) => {
+                        print!("{}", character);
+                        // Add character to input buffer for sys_read (Phase 10)
+                        crate::input::add_input_char(character as u8);
+                    }
+                    DecodedKey::RawKey(key) => {
+                        // Handle special keys like Enter, Backspace
+                        match key {
+                            pc_keyboard::KeyCode::Return => {
+                                println!(); // Visual feedback
+                                crate::input::add_input_char(b'\n'); // Newline for input buffer
+                            }
+                            pc_keyboard::KeyCode::Backspace => {
+                                print!("\x08 \x08"); // BS, space, BS for visual backspace
+                                // TODO: Would need mutable access to input buffer to properly handle
+                            }
+                            _ => print!("{:?}", key),
+                        }
+                    }
                 }
             }
         }
